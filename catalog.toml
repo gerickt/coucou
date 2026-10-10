@@ -1,0 +1,20 @@
+# Noctalia plugin source catalog for this repository.
+# Noctalia reads one [[plugin]] row per plugin and expects its files in the
+# subdirectory named after the part of the id after the slash: coucou/mochi
+# lives in mochi/. The plugin's own plugin.toml stays authoritative.
+#
+#   noctalia msg plugins source add coucou git https://github.com/gerickt/coucou
+#   noctalia msg plugins enable coucou/mochi
+
+[[plugin]]
+id = "coucou/mochi"
+name = "Mochi"
+version = "0.5.0"
+updated_at = 1791633600
+added_at = 1791633600
+author = "gerickt"
+license = "MIT"
+icon = "mood-smile"
+description = "Mochi watches your Claude Code and AI agent sessions from the desktop and the bar, and lets you approve or answer them with a click."
+plugin_api = 24
+tags = ["ai", "agent", "desktop", "bar", "panel", "productivity"]

@@ -9,10 +9,16 @@ permissions:
   contents: read
 
 jobs:
-  daemon:
+  rust:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        crate: [daemon, hook]
     steps:
       - uses: actions/checkout@v4
-      - name: Build coucou-daemon
+      - name: Test ${{ matrix.crate }}
+        run: cargo test --locked
+        working-directory: ${{ matrix.crate }}
+      - name: Build ${{ matrix.crate }}
         run: cargo build --release --locked
-        working-directory: daemon
+        working-directory: ${{ matrix.crate }}

@@ -1,15 +1,16 @@
 # Maintainer: gerickt
-# Coucou for Arch Linux: the coucou-daemon plus the Noctalia Mochi widget.
+# Coucou for Arch Linux: coucou-daemon, the coucou-hook relay and the
+# Noctalia plugin coucou/mochi, installed as a local Noctalia plugin source.
 
 pkgname=coucou-git
 _pkgname=coucou
-pkgver=0.4.0
+pkgver=0.5.0
 pkgrel=1
-pkgdesc="Mochi, a Noctalia bar widget that shows what your AI coding agents are doing"
+pkgdesc="Mochi, an animated Noctalia desktop and bar companion for AI coding agents, with approvals from the desktop"
 arch=('x86_64' 'aarch64')
 url="https://github.com/gerickt/coucou"
 license=("MIT" "LicenseRef-coucou-assets")
-depends=('noctalia-shell' 'xdg-utils')
+depends=('noctalia')
 makedepends=('git' 'cargo')
 provides=("$_pkgname")
 conflicts=("$_pkgname")
@@ -25,17 +26,33 @@ pkgver() {
 }
 
 build() {
-  cd "$_pkgname/daemon"
   export RUSTUP_TOOLCHAIN=stable
-  export CARGO_TARGET_DIR="$PWD/target"
-  cargo build --release --locked
+  for crate in daemon hook; do
+    (cd "$_pkgname/$crate" && CARGO_TARGET_DIR="$PWD/target" cargo build --release --locked)
+  done
+}
+
+check() {
+  export RUSTUP_TOOLCHAIN=stable
+  for crate in daemon hook; do
+    (cd "$_pkgname/$crate" && CARGO_TARGET_DIR="$PWD/target" cargo test --release --locked)
+  done
 }
 
 package() {
   cd "$_pkgname"
   install -Dm755 daemon/target/release/coucou-daemon "$pkgdir/usr/bin/coucou-daemon"
-  install -d "$pkgdir/usr/share/noctalia/plugins/coucou-mochi"
-  cp -r noctalia/. "$pkgdir/usr/share/noctalia/plugins/coucou-mochi/"
+  install -Dm755 hook/target/release/coucou-hook "$pkgdir/usr/bin/coucou-hook"
+  install -Dm644 daemon/coucou-daemon.service "$pkgdir/usr/lib/systemd/user/coucou-daemon.service"
+
+  # A local Noctalia plugin source: catalog.toml plus mochi/ (the directory
+  # Noctalia expects for the id coucou/mochi). Add it with
+  #   noctalia msg plugins source add coucou path /usr/share/coucou/noctalia
+  local src="$pkgdir/usr/share/coucou/noctalia"
+  install -Dm644 catalog.toml "$src/catalog.toml"
+  install -d "$src/mochi"
+  cp -r noctalia/plugin.toml noctalia/*.luau noctalia/translations noctalia/sounds "$src/mochi/"
+
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 LICENSE-ASSETS.md "$pkgdir/usr/share/licenses/$pkgname/LICENSE-ASSETS.md"
 }

@@ -1,5 +1,18 @@
 # Changelog
 
+## Linux 0.5.0 — October 10, 2026
+
+Mochi comes back to life on Noctalia.
+
+- **Mochi on the desktop**: an animated Noctalia desktop widget that blinks, bobs, squashes when his state changes and wears a badge for each state. Click him and he gets annoyed, triple-click him and he gets dizzy, hover him for 2 s and he falls in love
+- **Approvals and questions**: Allow / Deny for Claude Code and Codex permission requests, and answers to Claude Code's questions, from a Noctalia panel. Nothing is ever approved without a click; no click and the agent asks in its terminal
+- **coucou-hook is back**: the original relay, Linux only, with its timeouts (300 ms connect, 2 s per event, 110 s for a permission request)
+- **coucou-daemon**: holds a request only once Mochi shows it (800 ms ack, 108 s decision), one card at a time, and streams events to the plugin with `--follow`
+- **`coucou-daemon install-hooks`** for Claude Code, Gemini CLI, Antigravity and Codex: shows the diff, keeps a dated backup and writes only after you confirm
+- **Sounds**: Mochi's original state sounds, with a setting to turn them off
+- **Bar**: a mini Mochi with the running tool; right click pauses Mochi
+- Install the plugin as a Noctalia plugin source; the Arch package ships both binaries, a systemd user unit and a local plugin source
+
 ## Linux 0.4.0 — October 10, 2026
 
 Linux fork for Hyprland + Noctalia.
