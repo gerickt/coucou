@@ -1,0 +1,16 @@
+Unmodified copies of the original Mochi engine, from commit
+081a2ad5c1fde50742731b4a66cd356d63f03c8d (render.sh checks them against git):
+
+mochi/engine.ts   <- windows/src/mochi/engine.ts   84ced3a4055ff255530f1998ddc1d79c5695d1c65b7cef8af751f91d9e8dbdfa
+mochi/outfits.ts  <- windows/src/mochi/outfits.ts  fabf04a71f60f15f6a5e15d7f7d90e22559ee46f4d85f724ae3a2c8a2eff027f
+core/anim.ts      <- windows/src/core/anim.ts      3c1a3354050f7d276ef7a347a72f6c4ee6a09b8a0a7c84de9cb8d818d25ca334
+core/fonts.ts     <- windows/src/core/fonts.ts     a780898d7f3a50ff6d0bf4e98a7516c8256367fee632b2279d42f70c31437bb6
+
+(sha256 of each file.) Do not edit them. The only stand-in is shims/sound.ts,
+served for ../core/sound because the original plays Tauri-backed audio; the
+engine's Sound.play calls are no-ops at render time and the plugin plays the
+same sounds itself. Type-only imports (../core/layout, ./wardrobe) are erased
+by node:module stripTypeScriptTypes and never loaded.
+
+The Mochi character, its drawing and the sounds are not MIT: see
+LICENSE-ASSETS.md at the repository root.

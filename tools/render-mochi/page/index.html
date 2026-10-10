@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>render-mochi</title>
+    <style>
+      html, body { margin: 0; background: transparent; }
+    </style>
+  </head>
+  <body>
+    <!-- Virtual clock, seeded Math.random and virtual timers: installed before
+         the engine module is evaluated, so its own `now()` reads them. -->
+    <script src="/page/driver.js"></script>
+    <script type="module">
+      import { BotEngine } from "/mochi/engine";
+      window.__BotEngine = BotEngine;
+      window.__ready = true;
+    </script>
+  </body>
+</html>
