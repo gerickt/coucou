@@ -10,6 +10,9 @@
 //! coucou-daemon install-hooks [--agent <id>]... [--remove] [--yes]
 //!               [--status | --dry-run] [--json] [--home <dir>] [--hook-path <path>]
 //!               [--expect-sha256 <path>=<sha256>]...
+//! coucou-daemon secret has|set|delete <provider|key> [--bound-url <url>]   (set reads stdin)
+//! coucou-daemon chat --request <file>  one chat turn, streamed as JSON lines (chat.rs)
+//! coucou-daemon chat-models <provider> [--base-url <url>]
 //! ```
 //!
 //! `COUCOU_ACK_TIMEOUT_MS` and `COUCOU_DECISION_TIMEOUT_MS` override the
@@ -19,14 +22,19 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::time::Duration;
 
+mod chat;
 mod hub;
 mod install;
+mod net;
 mod paths;
 mod protocol;
+mod secrets;
 mod server;
 
 const USAGE: &str = "usage: coucou-daemon [--follow | --status-json | ack <id> | decline <id> | decide <id> <allow|deny|answers-json>]
        coucou-daemon install-hooks [--agent <id>]... [--remove] [--yes] [--status | --dry-run] [--json] [--home <dir>] [--hook-path <path>] [--expect-sha256 <path>=<sha256>]...
+       coucou-daemon secret has|set|delete <provider|key> [--bound-url <url>]
+       coucou-daemon chat --request <file> | chat-models <provider> [--base-url <url>]
        agents: claude, codex, copilot, muse, gemini, antigravity, cursor, opencode, amp, hermes";
 
 fn main() -> ExitCode {
@@ -42,6 +50,9 @@ fn main() -> ExitCode {
         }
         Some(verb @ ("ack" | "decline" | "decide")) => send(&control, &format!("{verb} {}", args[1..].join(" "))),
         Some("install-hooks") => install_hooks(&args[1..]),
+        Some("secret") => secret(&args[1..]),
+        Some("chat") => exit(chat::run(&args[1..], &mut std::io::stdout())),
+        Some("chat-models") => exit(chat::run_models(&args[1..], &mut std::io::stdout())),
         Some("-h" | "--help") => {
             println!("{USAGE}");
             ExitCode::SUCCESS
@@ -63,6 +74,25 @@ fn install_hooks(args: &[String]) -> ExitCode {
     };
     let stdin = std::io::stdin();
     match install::run(&opts, &mut stdin.lock(), &mut std::io::stdout()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => {
+            eprintln!("coucou-daemon: {err}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn exit(ok: bool) -> ExitCode {
+    if ok {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
+}
+
+fn secret(args: &[String]) -> ExitCode {
+    let stdin = std::io::stdin();
+    match secrets::run(args, &mut stdin.lock(), &mut std::io::stdout()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
             eprintln!("coucou-daemon: {err}");
