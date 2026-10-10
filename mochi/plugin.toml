@@ -1,17 +1,20 @@
 # Mochi for Noctalia: a little animated character that follows your AI coding
-# agent sessions (Claude Code, Gemini CLI, Antigravity, Codex) and lets you
+# agent sessions (Claude Code, Codex, Copilot CLI, Gemini CLI and more) and lets you
 # approve permission requests or answer questions from the desktop.
 #
 # service -> follows `coucou-daemon --follow`, runs Mochi's state machine,
 #            plays sounds, publishes everything to noctalia.state ("mochi")
-#            IPC: noctalia msg plugin coucou/mochi:daemon all toggle-pause|pause|resume|open
+#            IPC: noctalia msg plugin coucou/mochi:daemon all toggle-pause|pause|resume|open|agents
 # desktop -> the big animated Mochi (click, triple click, hover reactions)
 # bar     -> mini Mochi + current tool; left click opens the panel, right click opens the settings
 # sprite  -> shared: plays frames/ (the original Mochi engine, pre-rendered by
 #            tools/render-mochi) and resolves the outfit setting
 # panel   -> approval card (Allow / Deny) and AskUserQuestion answers
+# agents  -> Settings > Agents: detected / connected agents, diff preview, then
+#            Connect / Disconnect on an explicit click (coucou-daemon install-hooks)
 #
-# Needs coucou-daemon running and its hooks installed (`coucou-daemon install-hooks`).
+# Needs coucou-daemon running and its hooks installed (the Agents panel, or
+# `coucou-daemon install-hooks`).
 
 id = "coucou/mochi"
 name = "Mochi"
@@ -96,3 +99,9 @@ id = "approval"
 entry = "panel.luau"
 width = 440
 height = 420
+
+[[panel]]
+id = "agents"
+entry = "agents.luau"
+width = 520
+height = 560

@@ -163,14 +163,19 @@ function onMochiHover(state)
 end
 
 -- Desktop widgets take no right click on images, and a plugin cannot move its
--- own surface, so hovering Mochi shows two small buttons: settings (left or
--- right click) and move, which opens Noctalia's desktop widget editor.
+-- own surface, so hovering Mochi shows small buttons: settings (left or right
+-- click), agents (the Agents panel) and move, which opens Noctalia's desktop
+-- widget editor.
 local function msg(...)
   noctalia.runAsync({ "noctalia", "msg", ... }, function() end, 3000)
 end
 
 function onSettingsClick()
   msg("settings-open-plugin", "coucou/mochi")
+end
+
+function onAgentsClick()
+  msg("panel-open", "coucou/mochi:agents")
 end
 
 function onMoveClick()
@@ -195,9 +200,12 @@ local function render()
     ui.row({ width = S, align = "center", justify = "center", gap = 4 }, {
       ui.button({ glyph = "settings", variant = "ghost", controlSize = "sm", opacity = if tools then 1 else 0,
         enabled = tools, onClick = "onSettingsClick", onRightClick = "onSettingsClick", onHover = "onMochiHover" }),
+      ui.button({ glyph = "plug-connected", variant = "ghost", controlSize = "sm", opacity = if tools then 1 else 0,
+        enabled = tools, onClick = "onAgentsClick", onRightClick = "onAgentsClick", onHover = "onMochiHover",
+        tooltip = noctalia.tr("desktop.agents") }),
       ui.label({
         text = label, fontSize = math.max(10, S * 0.08), fontWeight = "semibold",
-        color = "on_surface", textAlign = "center", maxWidth = math.max(40, S - 80), maxLines = 1,
+        color = "on_surface", textAlign = "center", maxWidth = math.max(40, S - 112), maxLines = 1,
       }),
       ui.button({ glyph = "arrows-move", variant = "ghost", controlSize = "sm", opacity = if tools then 1 else 0,
         enabled = tools, onClick = "onMoveClick", onRightClick = "onSettingsClick", onHover = "onMochiHover" }),

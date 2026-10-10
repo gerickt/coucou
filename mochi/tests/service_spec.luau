@@ -51,4 +51,6 @@ feed('{"type":"hook","payload":{"hook_event_name":"UserPromptSubmit","session_id
 check(#played == p, "sounds respect the setting")
 feed('{"type":"hook","payload":{"hook_event_name":"SessionEnd","session_id":"s1"}}')
 check(#m().sessions >= 0, "session end handled")
+onIpc("agents")
+check(lastCall() == "noctalia msg panel-open coucou/mochi:agents", "agents IPC opens the Agents panel")
 print("ALL PASSED")

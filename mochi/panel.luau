@@ -9,6 +9,7 @@
 -- This is the only place a decision is made, and only on a click.
 
 local DAEMON = "coucou-daemon"
+local AGENTS_PANEL = "coucou/mochi:agents"
 
 local AGENTS = {
   [""] = "Claude Code", ["claude-desktop"] = "Claude", gemini = "Gemini CLI", antigravity = "Antigravity",
@@ -57,6 +58,12 @@ end
 
 function onAllow() decide("allow") end
 function onDeny() decide("deny") end
+
+-- Settings → Agents lives in its own panel.
+function onAgents()
+  panel.close()
+  noctalia.runAsync({ "noctalia", "msg", "panel-open", AGENTS_PANEL }, nil)
+end
 
 function onTerminal()
   local p = snap.pending
@@ -197,6 +204,7 @@ local function emptyView()
     header("Mochi", status),
     ui.label({ text = tr("panel.recent"), fontSize = 12, fontWeight = "semibold", color = "primary" }),
     ui.scroll({ flexGrow = 1, gap = 8 }, rows),
+    ui.button({ text = tr("panel.agents"), glyph = "plug-connected", variant = "outline", onClick = "onAgents" }),
   })
 end
 

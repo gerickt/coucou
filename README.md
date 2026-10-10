@@ -1,6 +1,6 @@
 # Coucou for Hyprland + Noctalia
 
-Mochi is a small animated character on your [Noctalia](https://github.com/noctalia-dev/noctalia-shell) desktop and bar. Mochi shows what your AI coding agents (Claude Code, Gemini CLI, Antigravity, Codex) are doing: thinking, working, searching, finished, or waiting for you. When an agent asks for a permission or asks a question, you approve, deny or answer with a click.
+Mochi is a small animated character on your [Noctalia](https://github.com/noctalia-dev/noctalia-shell) desktop and bar. Mochi shows what your AI coding agents (Claude Code, Codex, Copilot CLI, Muse Code, Gemini CLI, Antigravity, Cursor, OpenCode, Amp, Hermes) are doing: thinking, working, searching, finished, or waiting for you. When an agent asks for a permission or asks a question, you approve, deny or answer with a click.
 
 This is a Linux-only fork of [Louis-CFM/coucou](https://github.com/Louis-CFM/coucou). The macOS, iPhone and Windows apps were removed.
 
@@ -75,18 +75,30 @@ noctalia msg plugins enable coucou/mochi
 
 Then place the Mochi bar widget and the Mochi desktop widget from Noctalia's settings.
 
-### 4. Install the hooks
+### 4. Connect your agents
+
+Open the Agents panel: the plug button that shows when you hover the desktop Mochi, **Agents…** in the bar panel, or `noctalia msg plugin coucou/mochi:daemon all agents`. It lists every agent with whether it is installed on this machine and whether it is connected to Mochi. **Connect…** and **Disconnect…** first show the exact change and where the backup goes; nothing is written until you click **Back up and connect** (or **Back up and disconnect**).
+
+The same from a terminal:
 
 ```
 coucou-daemon install-hooks                      # Claude Code (~/.claude/settings.json)
+coucou-daemon install-hooks --agent codex        # Codex (~/.codex/hooks.json)
+coucou-daemon install-hooks --agent copilot      # GitHub Copilot CLI (~/.copilot/hooks/coucou.json)
+coucou-daemon install-hooks --agent muse         # Muse Code (~/.config/muse/settings.json)
 coucou-daemon install-hooks --agent gemini       # Gemini CLI (~/.gemini/settings.json)
 coucou-daemon install-hooks --agent antigravity  # Antigravity (~/.gemini/config/hooks.json)
-coucou-daemon install-hooks --agent codex        # Codex (~/.codex/hooks.json)
+coucou-daemon install-hooks --agent cursor       # Cursor Agent (~/.cursor/hooks.json)
+coucou-daemon install-hooks --agent opencode     # OpenCode plugin (~/.config/opencode/plugins/coucou.js)
+coucou-daemon install-hooks --agent amp          # Amp plugin (~/.config/amp/plugins/coucou.ts)
+coucou-daemon install-hooks --agent hermes       # Hermes plugin (~/.hermes/plugins/coucou/)
+coucou-daemon install-hooks --status [--json]    # installed / connected, per agent
+coucou-daemon install-hooks --dry-run --json --agent cursor  # the diff and backup path, nothing written
 ```
 
-Each run shows the diff and asks before writing. It keeps a dated backup (`settings.json.coucou-backup-YYYYMMDD-HHMMSS`) and leaves every other hook untouched. `--yes` skips the question, and `--remove` takes Coucou's hooks out again.
+Each run shows the diff and asks before writing. It keeps a dated backup (`settings.json.coucou-backup-YYYYMMDD-HHMMSS`) and leaves every other hook untouched. `--yes` skips the question, and `--remove` takes Coucou's hooks out again. OpenCode, Amp and Hermes get a plugin file of Coucou's own; a file of the same name that Coucou did not write is never touched. Hermes needs `hermes plugins enable coucou` once.
 
-Approvals and questions work for Claude Code and Codex. Gemini CLI and Antigravity show their activity, and their prompts stay in their own terminal.
+Approvals and questions work for Claude Code and Codex, and Allow / Deny for Copilot CLI and Muse Code. The other agents show their activity, and their prompts stay in their own terminal.
 
 ## Commands
 
@@ -97,6 +109,7 @@ Approvals and questions work for Claude Code and Codex. Gemini CLI and Antigravi
 | `coucou-daemon --follow` | Streams events as JSON lines (used by the plugin) |
 | `coucou-daemon decide <id> allow\|deny` | Answers a pending request |
 | `noctalia msg plugin coucou/mochi:daemon all toggle-pause` | Pauses or resumes Mochi |
+| `noctalia msg plugin coucou/mochi:daemon all agents` | Opens the Agents panel |
 
 ## Development
 

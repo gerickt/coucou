@@ -19,4 +19,10 @@ assert(calls[#calls]:find('decide 7%-2 {"answers":') and calls[#calls]:find('"Wh
 print("ok  question answers encoded in option order")
 noctalia.state.set("mochi", { state = "idle", daemon = false, rev = 3, sessions = { { id = "s", agent = "codex", project = "", state = "working" } } })
 validate(rendered)
+panelClosed = false
+local agentsButton = find(rendered, function(t) return t.type == "button" and t.props.onClick == "onAgents" end)
+assert(agentsButton, "empty view offers Agents")
+onAgents()
+assert(panelClosed and calls[#calls] == "noctalia msg panel-open coucou/mochi:agents", "agents button opens the Agents panel")
+print("ok  agents entry")
 print("PANEL PASSED")

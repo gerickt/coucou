@@ -14,7 +14,7 @@ cp "$plugin/sprite.luau" "$tmp/sprite.luau"
 mkdir "$tmp/frames"
 cp "$plugin/frames/manifest.luau" "$tmp/frames/manifest.luau"
 status=0
-for entry in service desktop bar panel; do
+for entry in service desktop bar panel agents; do
   ui="$here/mock_ui.luau"
   [ "$entry" = service ] && ui=/dev/null
   cat "$here/mock_host.luau" "$here/mock_json.luau" "$ui" "$plugin/$entry.luau" "$here/${entry}_spec.luau" > "$tmp/$entry.luau"

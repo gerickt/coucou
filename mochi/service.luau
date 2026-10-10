@@ -10,10 +10,11 @@
 -- for a human once acknowledged, within 800 ms) and the approval panel opens.
 -- Nothing is ever approved here: decisions come only from a click in the panel.
 --
--- IPC: noctalia msg plugin coucou/mochi:daemon all toggle-pause|pause|resume|open
+-- IPC: noctalia msg plugin coucou/mochi:daemon all toggle-pause|pause|resume|open|agents
 
 local KEY = "mochi"
 local PANEL = "coucou/mochi:approval"
+local AGENTS_PANEL = "coucou/mochi:agents"
 local DAEMON = "coucou-daemon"
 
 -- Agents whose permission requests can be answered (coucou-hook reply.rs).
@@ -140,8 +141,8 @@ local function safeId(id)
   return type(id) == "string" and id:match("^[%w%-]+$") ~= nil
 end
 
-local function openPanel(context)
-  local argv = { "noctalia", "msg", "panel-open", PANEL }
+local function openPanel(context, id)
+  local argv = { "noctalia", "msg", "panel-open", id or PANEL }
   if context then table.insert(argv, context) end
   noctalia.runAsync(argv, nil)
 end
@@ -374,6 +375,8 @@ function onIpc(event, _payload)
     setPaused(false)
   elseif event == "open" then
     openPanel(view.pending and view.pending.id or nil)
+  elseif event == "agents" then
+    openPanel(nil, AGENTS_PANEL)
   end
 end
 

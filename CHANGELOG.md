@@ -10,6 +10,9 @@ The original Mochi is back.
 - The `annoyed`, `greet` and `hover` sounds are back
 - The desktop widget's default size is now 160 px
 - `tools/render-mochi/render.sh` regenerates the frames
+- **Agents panel**: every agent with its installed and connected status, the exact diff and backup path before anything is written, and Connect / Disconnect on an explicit click. Open it from the desktop Mochi's plug button, **Agents…** in the bar panel, or `noctalia msg plugin coucou/mochi:daemon all agents`
+- **More agents**: GitHub Copilot CLI, Muse Code, Cursor Agent, OpenCode, Amp and Hermes Agent connect like the original app (same files, same plugins), with the same diff, dated backup and clean removal
+- `coucou-daemon install-hooks --status [--json]` and `--dry-run --json`
 
 ## Linux 0.5.0 — October 10, 2026
 

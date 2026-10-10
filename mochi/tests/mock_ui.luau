@@ -1,7 +1,7 @@
 -- Mocked ui.* builders and tree checks for the specs.
 local function node(kind) return function(props, children) return { type = kind, props = props or {}, children = children or {} } end end
 ui = {}
-for _, k in { "column", "row", "scroll", "box", "label", "glyph", "image", "spacer", "button", "separator", "progress" } do ui[k] = node(k) end
+for _, k in { "column", "row", "scroll", "box", "label", "glyph", "image", "spacer", "button", "separator", "progress", "markdown", "toggle" } do ui[k] = node(k) end
 rendered = nil
 frameTick = false
 desktopWidget = { render = function(t) rendered = t end, setNeedsFrameTick = function(on) frameTick = on end }

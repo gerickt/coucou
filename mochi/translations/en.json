@@ -59,6 +59,43 @@
     "offline": "coucou-daemon is not running.",
     "recent": "Recent sessions",
     "no_sessions": "No sessions yet.",
-    "send_failed": "Could not reach coucou-daemon; the agent will ask in its terminal."
+    "send_failed": "Could not reach coucou-daemon; the agent will ask in its terminal.",
+    "agents": "Agents…"
+  },
+  "desktop": {
+    "agents": "Agents"
+  },
+  "agents": {
+    "title": "Agents",
+    "intro": "Show your coding agents in Mochi. You see the exact change and where the backup goes before anything is written; disconnecting removes only what Coucou added.",
+    "refresh": "Refresh",
+    "loading": "Looking for agents…",
+    "load_failed": "Could not list the agents (is coucou-daemon installed?).",
+    "daemon_missing": "coucou-daemon could not be started.",
+    "no_relay": "The relay (coucou-hook) isn't installed, so agents cannot be connected yet.",
+    "detected": "Installed",
+    "not_found": "Not found",
+    "connected": "Connected",
+    "not_connected": "Not connected",
+    "relay_missing": "Relay missing",
+    "approvals": "Sessions, and Allow / Deny from Mochi",
+    "display_only": "Sessions; approvals stay in the agent",
+    "connect": "Connect…",
+    "reconnect": "Reconnect…",
+    "disconnect": "Disconnect…",
+    "preview_connect": "Connect {name}",
+    "preview_remove": "Disconnect {name}",
+    "preview_connect_hint": "This is exactly what changes. Nothing else is touched.",
+    "preview_remove_hint": "This removes Coucou's entries only. Everything else stays.",
+    "preview_failed": "Could not prepare the change.",
+    "up_to_date": "Already up to date: nothing to write.",
+    "backup": "Backup: {path}",
+    "no_backup": "No existing file: nothing to back up.",
+    "confirm_connect": "Back up and connect",
+    "confirm_remove": "Back up and disconnect",
+    "cancel": "Cancel",
+    "connected_done": "{name} connected.",
+    "removed": "{name} disconnected.",
+    "write_failed": "Could not write: {error}"
   }
 }
