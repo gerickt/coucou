@@ -1,0 +1,20 @@
+[package]
+name = "coucou-hook"
+description = "Relays AI coding agent hook events to coucou-daemon over a Unix socket"
+version = "0.5.0"
+edition = "2021"
+license = "MIT"
+
+[[bin]]
+name = "coucou-hook"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1"
+libc = "0.2"
+
+[profile.release]
+panic = "abort"
+opt-level = "s"
+lto = true
+strip = true

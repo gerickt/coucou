@@ -1,130 +1,110 @@
-use std::fs;
-use std::io::{BufRead, BufReader};
-use std::os::unix::fs::PermissionsExt;
-use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+//! coucou-daemon — the bridge between coucou-hook and the Noctalia plugin.
+//!
+//! ```text
+//! coucou-daemon                       serve both sockets (default)
+//! coucou-daemon --follow              print one JSON line per event (plugin stream)
+//! coucou-daemon --status-json         print the status snapshot
+//! coucou-daemon ack <id>              the card is on screen
+//! coucou-daemon decline <id>          nobody can act on it, hand back to the terminal
+//! coucou-daemon decide <id> <allow|deny|answers-json>
+//! ```
+//!
+//! `COUCOU_ACK_TIMEOUT_MS` and `COUCOU_DECISION_TIMEOUT_MS` override the
+//! 800 ms / 108 s waits (for testing).
 
-use serde::{Deserialize, Serialize};
+use std::path::Path;
+use std::process::ExitCode;
+use std::time::Duration;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct MochiStatus {
-    pub state: String,
-    pub agent: String,
-    pub tool: Option<String>,
-    pub active: bool,
-    pub last_updated: u64,
-}
+mod hub;
+mod paths;
+mod protocol;
+mod server;
 
-impl Default for MochiStatus {
-    fn default() -> Self {
-        Self {
-            state: "idle".to_string(),
-            agent: "Claude Code".to_string(),
-            tool: None,
-            active: false,
-            last_updated: 0,
+const USAGE: &str = "usage: coucou-daemon [--follow | --status-json | ack <id> | decline <id> | decide <id> <allow|deny|answers-json>]";
+
+fn main() -> ExitCode {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let dir = paths::runtime_dir();
+    let control = paths::control_socket(&dir);
+    match args.first().map(String::as_str) {
+        None | Some("serve") => serve(&dir),
+        Some("--follow") => follow(&control),
+        Some("--status-json") => {
+            println!("{}", server::status_or_offline(&control));
+            ExitCode::SUCCESS
+        }
+        Some(verb @ ("ack" | "decline" | "decide")) => send(&control, &format!("{verb} {}", args[1..].join(" "))),
+        Some("-h" | "--help") => {
+            println!("{USAGE}");
+            ExitCode::SUCCESS
+        }
+        Some(other) => {
+            eprintln!("unknown argument: {other}\n{USAGE}");
+            ExitCode::from(2)
         }
     }
 }
 
-fn socket_path() -> PathBuf {
-    let dir = std::env::var_os("XDG_RUNTIME_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(format!("/run/user/{}", unsafe { libc::getuid() })));
-    dir.join("coucou.sock")
+fn env_ms(key: &str) -> Option<Duration> {
+    std::env::var(key).ok()?.parse::<u64>().ok().map(Duration::from_millis)
 }
 
-fn state_file_path() -> PathBuf {
-    let dir = std::env::var_os("XDG_RUNTIME_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(format!("/run/user/{}", unsafe { libc::getuid() })));
-    dir.join("coucou-state.json")
-}
-
-fn print_status() {
-    let file = state_file_path();
-    if let Ok(content) = fs::read_to_string(&file) {
-        if let Ok(status) = serde_json::from_str::<MochiStatus>(&content) {
-            println!("{}", serde_json::to_string(&status).unwrap());
-            return;
-        }
+fn serve(dir: &Path) -> ExitCode {
+    if !paths::is_private_dir(dir) {
+        eprintln!("coucou-daemon: {} is not a private runtime directory (0700, owned by you)", dir.display());
+        return ExitCode::FAILURE;
     }
-    println!("{}", serde_json::to_string(&MochiStatus::default()).unwrap());
+    let defaults = hub::Timeouts::default();
+    let timeouts = hub::Timeouts {
+        ack: env_ms("COUCOU_ACK_TIMEOUT_MS").unwrap_or(defaults.ack),
+        decision: env_ms("COUCOU_DECISION_TIMEOUT_MS").unwrap_or(defaults.decision),
+    };
+    let relay = paths::relay_socket(dir);
+    let control = paths::control_socket(dir);
+    if let Err(err) = server::start(&relay, &control, timeouts) {
+        eprintln!("coucou-daemon: {err}");
+        return ExitCode::FAILURE;
+    }
+    eprintln!("coucou-daemon: listening on {} and {}", relay.display(), control.display());
+    loop {
+        std::thread::park();
+    }
 }
 
-fn handle_connection(stream: UnixStream, status: Arc<Mutex<MochiStatus>>) {
-    let mut reader = BufReader::new(stream);
-    let mut line = String::new();
-    if reader.read_line(&mut line).is_ok() {
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
-            let event = json.get("event").and_then(|v| v.as_str()).unwrap_or("");
-            let tool = json.get("tool_name").and_then(|v| v.as_str()).map(|s| s.to_string());
-            let agent = json.get("agent").and_then(|v| v.as_str()).unwrap_or("Claude Code").to_string();
-
-            let mut st = status.lock().unwrap();
-            st.agent = agent;
-            st.last_updated = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
-
-            match event {
-                "PreToolUse" => {
-                    st.state = "running".to_string();
-                    st.tool = tool;
-                    st.active = true;
-                }
-                "PermissionRequest" => {
-                    st.state = "permission".to_string();
-                    st.tool = tool;
-                    st.active = true;
-                }
-                "UserPromptSubmit" => {
-                    st.state = "thinking".to_string();
-                    st.tool = None;
-                    st.active = true;
-                }
-                "Stop" | "PostToolUse" => {
-                    st.state = "idle".to_string();
-                    st.tool = None;
-                    st.active = false;
-                }
-                _ => {}
+/// The plugin's stream. Never exits on its own while stdout is open: while the
+/// daemon is away it says so once and retries, so the plugin keeps one
+/// long-lived process.
+fn follow(control: &Path) -> ExitCode {
+    let mut out = std::io::stdout();
+    let mut announced = false;
+    loop {
+        match server::follow(control, &mut out) {
+            Err(err) if err.kind() == std::io::ErrorKind::BrokenPipe => return ExitCode::SUCCESS,
+            Ok(()) => announced = false,
+            Err(_) => {}
+        }
+        if !announced {
+            use std::io::Write;
+            if writeln!(out, r#"{{"type":"daemon","running":false}}"#).and_then(|_| out.flush()).is_err() {
+                return ExitCode::SUCCESS;
             }
-
-            let _ = fs::write(state_file_path(), serde_json::to_string(&*st).unwrap_or_default());
+            announced = true;
         }
+        std::thread::sleep(Duration::from_secs(2));
     }
 }
 
-fn run_daemon() {
-    let path = socket_path();
-    let _ = fs::remove_file(&path);
-
-    let listener = UnixListener::bind(&path).expect("Could not bind Unix socket");
-    let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o700));
-
-    let status = Arc::new(Mutex::new(MochiStatus::default()));
-    let _ = fs::write(state_file_path(), serde_json::to_string(&MochiStatus::default()).unwrap_or_default());
-
-    println!("coucou-daemon listening on {:?}", path);
-
-    for stream in listener.incoming() {
-        if let Ok(stream) = stream {
-            let status_clone = Arc::clone(&status);
-            std::thread::spawn(move || {
-                handle_connection(stream, status_clone);
-            });
+fn send(control: &Path, command: &str) -> ExitCode {
+    match server::request(control, command) {
+        Ok(answer) if answer == "ok" => ExitCode::SUCCESS,
+        Ok(answer) => {
+            eprintln!("coucou-daemon: {answer}");
+            ExitCode::FAILURE
         }
-    }
-}
-
-fn main() {
-    let args: Vec<String> = std::env::args().collect();
-    if args.iter().any(|a| a == "--status-json") {
-        print_status();
-    } else {
-        run_daemon();
+        Err(err) => {
+            eprintln!("coucou-daemon: daemon not reachable: {err}");
+            ExitCode::FAILURE
+        }
     }
 }

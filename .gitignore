@@ -5,3 +5,4 @@ linux/arch/src/
 .claude/
 .atl/
 .DS_Store
+hook/target/
