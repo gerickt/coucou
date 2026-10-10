@@ -13,6 +13,9 @@ The original Mochi is back.
 - **Agents panel**: every agent with its installed and connected status, the exact diff and backup path before anything is written, and Connect / Disconnect on an explicit click. Open it from the desktop Mochi's plug button, **Agents…** in the bar panel, or `noctalia msg plugin coucou/mochi:daemon all agents`
 - **More agents**: GitHub Copilot CLI, Muse Code, Cursor Agent, OpenCode, Amp and Hermes Agent connect like the original app (same files, same plugins), with the same diff, dated backup and clean removal
 - `coucou-daemon install-hooks --status [--json]` and `--dry-run --json`
+- **Preview fingerprints**: `--dry-run --json` gives each file's `sha256`, and `--expect-sha256 <path>=<sha256>` refuses to write a file that changed since the preview. The Agents panel passes them when you confirm
+- **More of the original Mochi**: he falls asleep after 120 s without agent activity once the pointer is away, and hover, a click or agent work wakes him. He dances while music plays (any MPRIS player, through `playerctl` when it is installed), is surprised when a request comes up, proud with a pop when you choose an outfit, and greets you by first name. Slap and hearts are drawn over his current state's colours
+- **Sounds as in the original**: all 29 sounds ship, and they play on the original's events (a session starting, a rate limit, done, an error, a request, the decision, coming back from pause, the launch greeting). Thinking, searching and falling asleep are silent, as in the original
 
 ## Linux 0.5.0 — October 10, 2026
 

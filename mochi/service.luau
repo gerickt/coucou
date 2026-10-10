@@ -3,8 +3,13 @@
 --
 -- Follows `coucou-daemon --follow` (one JSON line per hook event), runs the
 -- state machine of the original app (windows/src/island/hooks.ts), plays the
--- state sounds, and publishes one snapshot to noctalia.state("mochi") that the
--- desktop widget, the bar widget and the panel all render.
+-- sounds the original plays on those events, and publishes one snapshot to
+-- noctalia.state("mochi") that the desktop widget, the bar widget and the
+-- panel all render. Also follows the MPRIS players (playerctl, when there is
+-- one) so Mochi dances while music plays (core/spotify.ts desktopDances).
+--
+-- Sleep is the desktop widget's (desktop-logic.ts shouldSleep), as in the
+-- original: the island, here the bar, never dozes off.
 --
 -- Permission requests: the card is acknowledged at once (the daemon only waits
 -- for a human once acknowledged, within 800 ms) and the approval panel opens.
@@ -25,16 +30,14 @@ local SEARCH_TOOLS = {
   Grep = true, Glob = true, LS = true, WebSearch = true, WebFetch = true, ToolSearch = true,
   grep = true, glob = true, search = true, google_web_search = true, web_fetch = true,
 }
--- STATE_SOUND from the original engine.
-local STATE_SOUND = {
-  working = "work", thinking = "think", searching = "search", approval = "approval",
-  question = "question", error = "error", finished = "finish", ratelimit = "rate",
-  sleeping = "sleep",
-}
-local SOUNDS = { "work", "think", "search", "approval", "question", "error", "finish", "rate", "sleep", "approve", "close" }
+-- The original's sound triggers (hooks.ts and island.ts): SessionStart plays
+-- "work", a rate limit "rate", Stop "finish", StopFailure "error", a card
+-- "approval" or "question" as the island opens ("open"); a decision "approve"
+-- (allow, answer) or "blip" (deny, back to the terminal), then "close"; coming
+-- back from pause "peek". Thinking, searching and sleeping play nothing there.
+local SOUNDS = { "work", "rate", "finish", "error", "approval", "question", "open", "approve", "blip", "close", "peek" }
 
 local FINISHED_HOLD_MS = 5200
-local SLEEP_AFTER_MS = 5 * 60 * 1000
 local SESSION_FORGET_MS = 60 * 60 * 1000
 local STREAM_STALE_MS = 45 * 1000
 local MAX_SESSIONS = 8
@@ -52,6 +55,7 @@ local view = {
   sessions = {},
   rev = 0,
   stateSince = now(),
+  music = false,
 }
 local sessions = {} -- session id -> { id, agent, project, state, tool, updated, finishedAt }
 local focus = nil -- the session Mochi is showing
@@ -94,6 +98,7 @@ local function publish()
     project = view.project,
     paused = view.paused,
     daemon = view.daemon,
+    music = view.music,
     pending = view.pending,
     sessions = view.sessions,
     rev = view.rev,
@@ -101,7 +106,7 @@ local function publish()
 end
 
 -- Mochi shows the pending card first, else the session that spoke last.
-local function recompute(quiet)
+local function recompute()
   local before = view.state
   if view.pending then
     view.state = view.pending.kind
@@ -115,13 +120,10 @@ local function recompute(quiet)
     view.agent = s.agent
     view.project = s.project
   else
-    view.state = if before == "sleeping" then "sleeping" else "idle"
+    view.state = "idle"
     view.tool = ""
   end
-  if view.state ~= before then
-    view.stateSince = now()
-    if not quiet then play(STATE_SOUND[view.state]) end
-  end
+  if view.state ~= before then view.stateSince = now() end
   publish()
 end
 
@@ -231,6 +233,8 @@ local function onPermission(p, s)
   s.state = view.pending.kind
   s.tool = tool
   recompute()
+  play(view.pending.kind)
+  play("open")
   openPanel(id)
   return true
 end
@@ -247,6 +251,7 @@ local function onHook(p)
   local s = session(p)
   if name == "SessionStart" then
     s.state = "idle"
+    play("work")
   elseif name == "UserPromptSubmit" then
     s.state = "thinking"
     s.tool = ""
@@ -258,18 +263,21 @@ local function onHook(p)
   elseif name == "Notification" then
     local message = tostring(p.message or "")
     local lower = message:lower()
-    if lower:find("rate limit", 1, true) then
+    if lower:find("rate limit", 1, true) or lower:find("limite d", 1, true) then
       s.state = "ratelimit"
+      play("rate")
     elseif message:sub(-1) == "?" then
       s.state = "question"
     end
   elseif name == "Stop" then
     s.state = "finished"
     s.finishedAt = now()
+    play("finish")
   elseif name == "Interrupt" then
     s.state = "idle"
   elseif name == "StopFailure" then
     s.state = "error"
+    play("error")
   elseif name == "SessionEnd" then
     sessions[s.id] = nil
     if focus == s.id then focus = nil end
@@ -295,10 +303,11 @@ local function onResolved(msg)
   end
   if outcome == "allow" or outcome == "answered" then
     play("approve")
-  elseif outcome == "deny" then
-    play("close")
+  elseif outcome == "deny" or outcome == "declined" then
+    play("blip")
   end
-  recompute(true)
+  play("close")
+  recompute()
 end
 
 local function onHello(msg)
@@ -332,7 +341,7 @@ local function handleLine(line)
     local was = view.daemon
     view.daemon = msg.running == true
     if not view.daemon and view.pending then view.pending = nil end
-    if was ~= view.daemon then recompute(true) end
+    if was ~= view.daemon then recompute() end
   end
 end
 
@@ -363,7 +372,8 @@ local function setPaused(paused)
     daemon({ "decline", view.pending.id })
     view.pending = nil
   end
-  recompute(true)
+  if not paused then play("peek") end
+  recompute()
 end
 
 function onIpc(event, _payload)
@@ -387,7 +397,22 @@ noctalia.state.watch("mochi.cmd", function(cmd)
   end
 end)
 
--- ── Ticks: finished -> idle, idle -> sleeping, stream watchdog ──────────────
+-- ── Music: MPRIS through playerctl, when installed ──────────────────────────
+
+local function setMusic(line)
+  local on = type(line) == "string" and line:match("^%s*(.-)%s*$") == "Playing"
+  if on == view.music then return end
+  view.music = on
+  publish()
+end
+
+local function startMusic()
+  -- No playerctl: no dance, nothing else changes.
+  if not (noctalia.commandExists and noctalia.commandExists("playerctl")) then return end
+  noctalia.runStream("playerctl -F -f '{{status}}' status 2>/dev/null", setMusic)
+end
+
+-- ── Ticks: finished -> idle, stream watchdog ────────────────────────────────
 
 function update()
   local t = now()
@@ -404,13 +429,7 @@ function update()
       changed = true
     end
   end
-  if changed then recompute(true) end
-  if view.state == "idle" and not view.paused and t - view.stateSince > SLEEP_AFTER_MS then
-    view.state = "sleeping"
-    view.stateSince = t
-    play(STATE_SOUND.sleeping)
-    publish()
-  end
+  if changed then recompute() end
   if t - lastLine > STREAM_STALE_MS then
     noctalia.log("mochi: daemon stream silent, restarting it")
     startStream()
@@ -420,3 +439,4 @@ end
 noctalia.setUpdateInterval(1000)
 publish()
 startStream()
+startMusic()

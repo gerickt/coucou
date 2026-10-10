@@ -150,6 +150,14 @@ function Player:once(name, onDone)
   return true
 end
 
+--- Drops the one-shot in flight (its body no longer matches), back to the loop.
+function Player:cancel()
+  if not self.onceName then return end
+  self.onceName = nil
+  self.onDone = nil
+  self:start(self.loopName)
+end
+
 function Player:setOutfit(outfit)
   if outfit == self.outfit then return end
   self.outfit = outfit

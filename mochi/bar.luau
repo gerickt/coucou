@@ -3,7 +3,8 @@
 --
 -- The original Mochi in the state's loop (frames rendered from the original
 -- engine by tools/render-mochi, see sprite.luau), wearing the chosen outfit, a
--- dot when a request waits, and optionally the running tool. Left click opens
+-- dot when a request waits, and optionally the running tool. Dances while
+-- music plays. Left click opens
 -- the approval panel; right click (manifest action) pauses or resumes Mochi.
 --
 -- Pure view of noctalia.state("mochi"). Bar widgets may not receive
@@ -78,7 +79,11 @@ local function tick()
     outfitCheckMs = now + 1000
     player:setOutfit(sprite.resolveOutfit(noctalia.getConfig("outfit")))
   end
-  player:setLoop(baseState())
+  -- Dances while music plays, by the compact island's rules (core/spotify.ts
+  -- islandDances); the frames have the dance over the idle body.
+  local loop = baseState()
+  if loop == "idle" and snap.music == true and player:has("dance") then loop = "dance" end
+  player:setLoop(loop)
   player:step(secs)
   render()
   noctalia.setUpdateInterval(math.floor(math.clamp(player:due() * 1000, 50, 400)))

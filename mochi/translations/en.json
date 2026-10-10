@@ -63,7 +63,8 @@
     "agents": "Agents…"
   },
   "desktop": {
-    "agents": "Agents"
+    "agents": "Agents",
+    "greeting": "Coucou, {name}!"
   },
   "agents": {
     "title": "Agents",

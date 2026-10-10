@@ -9,7 +9,7 @@ local function shows(key)
 end
 for _, outfit in sprite.OUTFITS do
   if outfit ~= "auto" then
-    for _, st in { "idle", "working", "thinking", "searching", "approval", "question", "error", "finished", "ratelimit", "sleeping" } do
+    for _, st in { "idle", "working", "thinking", "searching", "approval", "question", "error", "finished", "ratelimit", "sleeping", "dance" } do
       assert(manifest[outfit .. "." .. st], "missing bar sequence " .. outfit .. "." .. st)
     end
   end
@@ -27,6 +27,12 @@ for i = 1, 3 do advance(1100) update() end
 noctalia.state.set("mochi", { state = "working", tool = "Edit", daemon = true, rev = 7 })
 for i = 1, 3 do advance(100) update() end
 assert(shows("santaHat.working"), "bar wears the outfit")
+noctalia.state.set("mochi", { state = "idle", daemon = true, music = true, rev = 8 })
+for i = 1, 3 do advance(100) update() end
+assert(shows("santaHat.dance"), "the bar dances while music plays")
+noctalia.state.set("mochi", { state = "approval", daemon = true, music = true, pending = { id = "1-1" }, rev = 9 })
+for i = 1, 3 do advance(100) update() end
+assert(shows("santaHat.approval"), "an alert wins over the music")
 onClick()
 assert(calls[#calls] == "toggle coucou/mochi:approval")
 print("BAR PASSED")

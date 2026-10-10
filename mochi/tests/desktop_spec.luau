@@ -15,7 +15,7 @@ for _, outfit in sprite.OUTFITS do
   if outfit ~= "auto" then
     for _, name in { "idle", "working", "thinking", "searching", "approval", "question", "error", "finished",
       "ratelimit", "sleeping", "dizzy", "approval.enter", "error.enter", "finished.enter", "dizzy.enter",
-      "dizzy.exit", "slap", "love", "greet" } do
+      "dizzy.exit", "slap", "love", "greet", "proud", "approval.alert", "question.alert", "gulp", "dance" } do
       assert(manifest[outfit .. "." .. name], "missing desktop sequence " .. outfit .. "." .. name)
     end
   end
@@ -25,7 +25,9 @@ print("ok  every outfit has every desktop sequence")
 -- Start: the greeting plays (in today's "auto" outfit), then the idle loop.
 assert(image() and shows(sprite.resolveOutfit(nil) .. ".greet"), "greets on start")
 config.outfit = "none"
-assert(played[#played] == "greet", "greet sound")
+assert(played[#played] == "greeting", "the launch greeting's own sound (greeting.ts)")
+assert(calls[1] == "getent passwd tester", "reads the account's full name")
+assert(find(rendered, function(n) return n.type == "label" and n.props.text == "desktop.greeting" end), "greets by first name")
 run(2.5)
 noctalia.state.set("mochi", { state = "idle", tool = "", daemon = true, rev = 1 })
 run(0.1)
@@ -36,7 +38,7 @@ print("ok  greet, then idle")
 for _, st in { "working", "thinking", "searching", "approval", "question", "error", "finished", "ratelimit", "sleeping" } do
   noctalia.state.set("mochi", { state = st, tool = "Bash", paused = false, daemon = true, rev = 2 })
   run(0.05)
-  local enter = ({ approval = "none.approval.enter", error = "none.error.enter", finished = "none.finished.enter" })[st]
+  local enter = ({ approval = "none.approval.alert", question = "none.question.alert", error = "none.error.enter", finished = "none.finished.enter" })[st]
   if enter then assert(shows(enter), st .. " plays its entrance") end
   run(2.0)
   assert(shows("none." .. st), st .. " loops")
@@ -102,6 +104,8 @@ print("ok  paused sleeps")
 config.outfit = "witchHat"
 noctalia.state.set("mochi", { state = "idle", daemon = true, rev = 6 })
 run(1.2)
+assert(shows("witchHat.proud") and played[#played] == "pop", "a new outfit: pop, and proud (island.ts chooseOutfit)")
+run(2.5)
 assert(shows("witchHat.idle"), "wears the chosen outfit")
 config.outfit = "garbage"
 run(1.2)
@@ -130,6 +134,66 @@ assert(sprite.seasonalOutfit(2026, 7, 14) == "sunglasses")
 assert(sprite.seasonalOutfit(2026, 6, 20) == "none")
 assert(sprite.resolveOutfit("crown") == "crown")
 print("ok  seasonal outfits")
+
+-- Reactions over the current state's body; outfits without it use the idle one.
+noctalia.state.set("mochi", { state = "working", tool = "Bash", daemon = true, rev = 20 })
+run(1.0)
+onMochiClick() run(0.02)
+assert(shows("none.working.slap"), "slap drawn over the working body")
+run(1.2)
+config.outfit = "crown" run(3.5)
+onMochiClick() run(0.02)
+assert(shows("crown.slap"), "outfit falls back to the idle-body slap")
+config.outfit = "none" run(3.5)
+
+-- Dance while music plays, in the dance states (core/spotify.ts desktopDances).
+noctalia.state.set("mochi", { state = "idle", daemon = true, music = true, rev = 21 })
+run(0.5)
+assert(shows("none.dance"), "dances to music when idle")
+noctalia.state.set("mochi", { state = "error", daemon = true, music = true, rev = 22 })
+run(1.5)
+assert(shows("none.error"), "an error wins over the music")
+noctalia.state.set("mochi", { state = "idle", daemon = true, music = false, rev = 23 })
+run(0.5)
+assert(shows("none.idle"), "music stops: no dance")
+print("ok  per-state reactions and the dance")
+
+-- Sleep after 120 s without agent activity, once the pointer is away
+-- (desktop-logic.ts shouldSleep); hover or agent work wakes him.
+run(100)
+assert(shows("none.idle"), "awake before 120 s")
+run(25)
+assert(shows("none.sleeping"), "asleep after 120 s of no agent activity")
+onMochiHover("true") run(0.1)
+assert(shows("none.idle"), "hover wakes him")
+onMochiHover("false")
+run(122)
+assert(shows("none.sleeping"), "asleep again")
+noctalia.state.set("mochi", { state = "working", tool = "Bash", daemon = true, rev = 24 })
+run(0.1)
+assert(shows("none.working"), "agent work wakes him")
+run(200)
+assert(shows("none.working"), "never asleep while an agent works")
+noctalia.state.set("mochi", { state = "idle", daemon = true, music = true, rev = 25 })
+run(200)
+assert(shows("none.dance"), "the music keeps him up")
+noctalia.state.set("mochi", { state = "idle", daemon = true, rev = 26 })
+run(118) onMochiClick() run(2)
+assert(not shows("none.sleeping"), "a click counts as the pointer near him")
+run(3)
+assert(shows("none.sleeping"), "asleep once the pointer has been away 4 s")
+print("ok  sleep after 120 s, wakes on hover and agent work")
+
+-- First name (identity.rs first_name_from).
+assert(firstNameFrom("Théodore Riant") == "Théodore")
+assert(firstNameFrom("  Louis Raille ") == "Louis")
+assert(firstNameFrom("Jean-Luc Picard") == "Jean-Luc")
+assert(firstNameFrom("O'Brien Miles") == "O'Brien")
+assert(firstNameFrom("Zoë") == "Zoë")
+for _, bad in { "", "   ", "theodoreriant", "t.riant2", "Louis2", "louis_r", "me@example", "Admin_01", "R2-D2 Unit", "Dr. Who", "Louis " .. string.rep("a", 40) } do
+  assert(firstNameFrom(bad) == nil, "no first name in " .. bad)
+end
+print("ok  first name rules")
 onAgentsClick()
 assert(lastCall() == "noctalia msg panel-open coucou/mochi:agents", "agents button opens the Agents panel")
 print("ok  agents button")
