@@ -149,9 +149,33 @@ function oneShot(mode, outfit, name, [len, base, events]) {
   };
 }
 
+// P14 gaze: the overlay's eyes follow the pointer. The original desktop window
+// set engine.lookX / lookY from the cursor every frame (desktop/main.ts draw,
+// desktop-logic.ts gaze: tanh of the distance, x right +, y up +); here each
+// state loop gets eight still directions, set before the warm-up so the
+// engine's own easing has settled. Same seed as the plain loop, so blinks fall
+// on the same frames and the overlay can swap variants without a hitch.
+export const GAZE_STATES = ["idle", "working"];
+const D = 0.7;
+export const GAZE = {
+  n: [0, 0.9], ne: [D, D], e: [0.9, 0], se: [D, -D],
+  s: [0, -0.9], sw: [-D, -D], w: [-0.9, 0], nw: [-D, D],
+};
+
+function gazeSeq(mode, outfit, state, dir) {
+  const [x, y] = GAZE[dir];
+  const q = loopSeq(mode, outfit, state);
+  return {
+    ...q,
+    name: `${outfit}.${state}.look.${dir}`,
+    events: [[-2.95, "set", "lookX", x], [-2.95, "set", "lookY", y]],
+  };
+}
+
 export const SEQUENCES = [];
 for (const outfit of OUTFITS) {
   for (const s of STATES) SEQUENCES.push(loopSeq("desktop", outfit, s));
+  for (const s of GAZE_STATES) for (const dir of Object.keys(GAZE)) SEQUENCES.push(gazeSeq("desktop", outfit, s, dir));
   for (const [n, d] of Object.entries(ENTERS)) SEQUENCES.push(oneShot("desktop", outfit, n, d));
   for (const [n, d] of Object.entries(REACTIONS)) SEQUENCES.push(oneShot("desktop", outfit, n, d));
   for (const [n, d] of Object.entries(DRESSED)) SEQUENCES.push(oneShot("desktop", outfit, n, d));

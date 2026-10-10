@@ -11,7 +11,8 @@ shimmer). Frames are stored once under a content-hash name, so a still frame
 shared by many sequences costs one file. Runs of identical frames inside a
 sequence become one entry with a hold count.
 
-Writes <frames-dir>/manifest.luau (what the widgets require) and
+Writes <frames-dir>/manifest.luau (what the widgets require),
+<frames-dir>/manifest.json (the desktop sequences, for the coucou-mochi overlay) and
 <work-dir>/index.json (the expanded frame list, for render.mjs --compare).
 """
 
@@ -139,6 +140,22 @@ def main():
     lines.append("}")
     with open(os.path.join(frames_dir, "manifest.luau"), "w") as fh:
         fh.write("\n".join(lines) + "\n")
+    # The same desktop sequences for the coucou-mochi overlay (overlay/), which
+    # reads JSON. Sorted keys and fixed separators keep the file deterministic.
+    desktop = {
+        "px": sizes["desktop"],
+        "sequences": {
+            q["name"]: {
+                "fps": round(q["fps"], 4),
+                "loop": q["kind"] == "loop",
+                "frames": [["frames/" + r, n] for r, n in runs],
+            }
+            for q, runs in seqs["desktop"]
+        },
+    }
+    with open(os.path.join(frames_dir, "manifest.json"), "w") as fh:
+        json.dump({"desktop": desktop}, fh, sort_keys=True, separators=(",", ":"))
+        fh.write("\n")
     with open(os.path.join(work, "index.json"), "w") as fh:
         json.dump({"sequences": index}, fh)
 
