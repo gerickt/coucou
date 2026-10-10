@@ -122,6 +122,8 @@ pub struct Hub {
     followers: Mutex<Vec<Sender<String>>>,
     status: Mutex<Status>,
     counter: AtomicU64,
+    /// Where each session's terminal is (terminal.rs).
+    pub windows: crate::terminal::Sessions,
 }
 
 impl Hub {

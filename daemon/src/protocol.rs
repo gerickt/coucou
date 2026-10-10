@@ -5,7 +5,8 @@
 //!   `deny`, or `{"answers":{...}}`. No decision means no line at all.
 //! * Control socket (`coucou-ctl.sock`): one command per connection, a single
 //!   text line — `follow`, `status`, `ack <id>`, `decline <id>` or
-//!   `decide <id> <allow|deny|answers-json>`.
+//!   `decide <id> <allow|deny|answers-json>`, or `window <session_id>`
+//!   (answered `ok <pid>,<pid>…` or `err …`).
 
 use std::io::Read;
 
@@ -27,6 +28,8 @@ pub enum Control {
     Decline(String),
     /// Request id and the normalised decision line.
     Decide(String, String),
+    /// The processes that may own a session's window (`window <session_id>`).
+    Window(String),
 }
 
 /// Parses one control line.
@@ -48,6 +51,8 @@ pub fn parse_control(line: &str) -> Result<Control, String> {
             let id = valid_id(id)?;
             Ok(Control::Decide(id, normalize_decision(decision)?))
         }
+        "window" if crate::terminal::valid_session(rest) => Ok(Control::Window(rest.to_string())),
+        "window" => Err("invalid session id".to_string()),
         _ => Err(format!("unknown command: {verb}")),
     }
 }
@@ -175,6 +180,8 @@ mod tests {
         assert_eq!(parse_control("decide 12-3 allow"), Ok(Control::Decide("12-3".into(), "allow".into())));
         assert_eq!(parse_control("decide 12-3 always"), Ok(Control::Decide("12-3".into(), "allow".into())));
         assert_eq!(parse_control("decide 12-3 deny"), Ok(Control::Decide("12-3".into(), "deny".into())));
+        assert_eq!(parse_control("window ab-12_c"), Ok(Control::Window("ab-12_c".into())));
+        assert!(parse_control("window ../x").is_err() && parse_control("window").is_err());
     }
 
     #[test]

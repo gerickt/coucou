@@ -26,8 +26,8 @@ pub const HEARTBEAT: Duration = Duration::from_secs(15);
 /// How long a follower may stall a write before it is dropped.
 const WRITE_TIMEOUT: Duration = Duration::from_millis(500);
 
-/// The uid of the process on the other end, as the kernel saw it.
-fn peer_uid(stream: &UnixStream) -> Option<u32> {
+/// The process on the other end, as the kernel saw it.
+fn peer_cred(stream: &UnixStream) -> Option<libc::ucred> {
     let mut cred: libc::ucred = unsafe { std::mem::zeroed() };
     let mut len = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
     let rc = unsafe {
@@ -39,11 +39,16 @@ fn peer_uid(stream: &UnixStream) -> Option<u32> {
             &mut len,
         )
     };
-    (rc == 0 && len as usize == std::mem::size_of::<libc::ucred>()).then_some(cred.uid)
+    (rc == 0 && len as usize == std::mem::size_of::<libc::ucred>()).then_some(cred)
 }
 
 pub fn same_user(stream: &UnixStream) -> bool {
-    peer_uid(stream) == Some(crate::paths::uid())
+    peer_cred(stream).map(|c| c.uid) == Some(crate::paths::uid())
+}
+
+/// The relay's pid (SO_PEERCRED), to find its terminal (terminal.rs).
+fn peer_pid(stream: &UnixStream) -> Option<u32> {
+    peer_cred(stream).and_then(|c| u32::try_from(c.pid).ok()).filter(|pid| *pid > 1)
 }
 
 /// False once the peer hung up (or the socket broke).
@@ -112,9 +117,14 @@ fn accept_loop(listener: UnixListener, handler: impl Fn(UnixStream) + Send + Syn
 /// One relay connection: one hook event.
 fn handle_relay(hub: &Hub, mut stream: UnixStream, timeouts: Timeouts) {
     let _ = stream.set_read_timeout(Some(READ_TIMEOUT));
+    // The relay's ancestors lead to the session's terminal window ("Open
+    // terminal"). Walked before reading: a relay with nothing to wait for
+    // exits right after its line, and then /proc no longer has it.
+    let ancestors = peer_pid(&stream).map(crate::terminal::process_ancestors).unwrap_or_default();
     let Some(line) = protocol::read_line(&mut stream, protocol::MAX_LINE) else { return };
     let Some((event, mut payload)) = protocol::parse_hook(&line) else { return };
     hub.note(&event, &payload);
+    hub.windows.note(&payload, &event, ancestors);
 
     if event != "PermissionRequest" {
         hub.broadcast(&json!({ "type": "hook", "payload": protocol::slim(&payload) }));
@@ -172,6 +182,14 @@ fn handle_control(hub: &Hub, mut stream: UnixStream) {
         Control::Ack(id) => hub.reply(&id, Reply::Ack),
         Control::Decline(id) => hub.reply(&id, Reply::Decline),
         Control::Decide(id, d) => hub.reply(&id, Reply::Decision(d)),
+        Control::Window(session) => {
+            let answer = match hub.windows.lookup(&session) {
+                Some(pids) => format!("ok {}", crate::terminal::encode_pids(&pids)),
+                None => "err unknown session".to_string(),
+            };
+            let _ = writeln!(stream, "{answer}");
+            return;
+        }
     };
     let _ = writeln!(stream, "{}", if delivered { "ok" } else { "err unknown request" });
 }
@@ -362,6 +380,25 @@ mod tests {
         assert_eq!(status["agent"], "gemini");
         assert_eq!(status["tool"], "Edit");
         assert_eq!(request(&c, "bogus").unwrap(), "err unknown command: bogus");
+    }
+
+    #[test]
+    fn a_session_remembers_where_its_relay_ran() {
+        let (r, c) = temp_sockets("window");
+        let _hub = start(&r, &c, short()).unwrap();
+        // The relay here is a thread of this test: SO_PEERCRED gives our pid.
+        let out = relay(r.clone(), "{\"hook_event_name\":\"PreToolUse\",\"session_id\":\"test-win-1\"}\n");
+        assert_eq!(out.join().unwrap(), "");
+        let expected = crate::terminal::process_ancestors(std::process::id());
+        let answer = request(&c, "window test-win-1").unwrap();
+        if expected.is_empty() {
+            assert_eq!(answer, "err unknown session");
+        } else {
+            assert_eq!(answer, format!("ok {}", crate::terminal::encode_pids(&expected)));
+        }
+        assert_eq!(request(&c, "window test-never").unwrap(), "err unknown session");
+        relay(r, "{\"hook_event_name\":\"SessionEnd\",\"session_id\":\"test-win-1\"}\n").join().unwrap();
+        assert_eq!(request(&c, "window test-win-1").unwrap(), "err unknown session");
     }
 
     #[test]
