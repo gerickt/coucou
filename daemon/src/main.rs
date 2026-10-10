@@ -96,25 +96,21 @@ fn serve(dir: &Path) -> ExitCode {
 }
 
 /// The plugin's stream. Never exits on its own while stdout is open: while the
-/// daemon is away it says so once and retries, so the plugin keeps one
-/// long-lived process.
+/// daemon is away it says so every few seconds (which doubles as a heartbeat)
+/// and retries, so the plugin keeps one long-lived process.
 fn follow(control: &Path) -> ExitCode {
+    use std::io::Write;
     let mut out = std::io::stdout();
-    let mut announced = false;
     loop {
-        match server::follow(control, &mut out) {
-            Err(err) if err.kind() == std::io::ErrorKind::BrokenPipe => return ExitCode::SUCCESS,
-            Ok(()) => announced = false,
-            Err(_) => {}
-        }
-        if !announced {
-            use std::io::Write;
-            if writeln!(out, r#"{{"type":"daemon","running":false}}"#).and_then(|_| out.flush()).is_err() {
+        if let Err(err) = server::follow(control, &mut out) {
+            if err.kind() == std::io::ErrorKind::BrokenPipe {
                 return ExitCode::SUCCESS;
             }
-            announced = true;
         }
-        std::thread::sleep(Duration::from_secs(2));
+        if writeln!(out, r#"{{"type":"daemon","running":false}}"#).and_then(|_| out.flush()).is_err() {
+            return ExitCode::SUCCESS;
+        }
+        std::thread::sleep(Duration::from_secs(5));
     }
 }
 

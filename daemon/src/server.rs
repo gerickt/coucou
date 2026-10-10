@@ -21,6 +21,8 @@ use crate::protocol::{self, Control};
 
 /// How long any peer gets to send its single line.
 const READ_TIMEOUT: Duration = Duration::from_secs(2);
+/// How often followers hear from us when nothing happens.
+pub const HEARTBEAT: Duration = Duration::from_secs(15);
 /// How long a follower may stall a write before it is dropped.
 const WRITE_TIMEOUT: Duration = Duration::from_millis(500);
 
@@ -81,6 +83,13 @@ pub fn start(relay: &Path, control: &Path, timeouts: Timeouts) -> io::Result<Arc
     thread::spawn(move || accept_loop(relay_listener, move |s| handle_relay(&h, s, timeouts)));
     let h = hub.clone();
     thread::spawn(move || accept_loop(control_listener, move |s| handle_control(&h, s)));
+    // A heartbeat, so a follower can tell a quiet daemon from a dead stream,
+    // and followers that left are dropped even when nothing happens.
+    let h = hub.clone();
+    thread::spawn(move || loop {
+        thread::sleep(HEARTBEAT);
+        h.broadcast(&json!({ "type": "ping" }));
+    });
     Ok(hub)
 }
 
