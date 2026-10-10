@@ -28,6 +28,8 @@ Chat providers, GitHub, Spotify, weekly recap, plan usage, file drop, diff viewe
 - [x] T4 Packaging: catalog.toml, PKGBUILD, README install-as-plugin — route: delegated — be54766 (git-source layout gap, see Progress)
 - [x] T5 Live validation on Hyprland/Noctalia: fake hook events, screenshot, approve/deny round trip — route: parent (inline: state checks and one CPU fix)
 
+- [ ] T6 Reuse the original Mochi: render windows/src/mochi/engine.ts + outfits.ts (081a2ad) unmodified in headless Chrome to PNG frame sequences per state/emote/reaction/outfit; desktop and bar widgets play those frames instead of the box-drawn Mochi — route: delegated (user correction: original character, animations and reactions must be reused, not redesigned)
+
 ## Acceptance criteria
 - `cargo test` and `cargo build --release` pass for daemon and hook.
 - `noctalia plugins lint mochi` passes.
