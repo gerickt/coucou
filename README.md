@@ -20,7 +20,8 @@ agent hook ──> coucou-hook ──> $XDG_RUNTIME_DIR/coucou.sock ──> couc
   - **bar widget**: a mini Mochi and the running tool. Left click opens the panel, right click pauses or resumes Mochi.
   - **outfit setting**: Auto (follows the seasons: party hat, Santa hat, witch hat, bunny ears, sunglasses), None, or one of the 11 wardrobe outfits.
   - **panel**: Allow / Deny for permission requests, and the options of Claude Code's questions.
-  - **service**: follows the daemon, keeps Mochi's state and plays his sounds.
+  - **chat**: Mochi's chat with Anthropic, Google AI, OpenAI, OpenRouter, Ollama, LM Studio or any OpenAI-compatible server. Answers stream in as Markdown.
+  - **service**: follows the daemon, keeps Mochi's state, runs the chat and plays his sounds.
 
 ## Install
 
@@ -100,6 +101,22 @@ Each run shows the diff and asks before writing. It keeps a dated backup (`setti
 
 Approvals and questions work for Claude Code and Codex, and Allow / Deny for Copilot CLI and Muse Code. The other agents show their activity, and their prompts stay in their own terminal.
 
+### 5. Chat
+
+Open the chat from the speech-bubble button that shows when you hover the desktop Mochi, **Chat…** in the bar panel, the **Mochi chat** quick-settings tile, or `noctalia msg panel-toggle coucou/mochi:chat`. The original's Ctrl+Alt+Space, in `hyprland.conf`:
+
+```
+bind = CTRL ALT, Space, exec, noctalia msg panel-toggle coucou/mochi:chat
+```
+
+- **Keys**: the key button lists the providers with *Key saved* or *No key*. A saved key goes to the system keyring (Secret Service: GNOME Keyring, KWallet) with the original app's attributes; the plugin only learns whether it is there. A custom server's key is stored with its address and only ever sent there (over https, or to this computer).
+- **Model**: click the model name above the conversation to switch provider and pick a model from the provider's own list.
+- **Answers** stream in. Reasoning models' `<think>` blocks stay hidden. **Copy** and **Code n** copy an answer or one of its code blocks. Stop ends a turn and keeps what came so far. Mochi thinks while he answers.
+- **Files**: copy a file in your file manager (Ctrl+C), then click the clip button. Mochi swallows it and the next question is about it: text inline (up to 24 000 characters for the model servers), images and PDF by name for the model servers, as data for Claude and the cloud providers. Noctalia's drop zones only take drags from inside the shell, so a file cannot be dropped on the panel.
+- `COUCOU_ANTHROPIC_BASE_URL` points Claude at an Anthropic-compatible gateway (https only; plain http only to this computer), as in the original.
+
+The requests leave from `coucou-daemon chat`, which hands `curl` the address, headers and body on its stdin: no key is ever on a command line or on disk. Nothing is sent anywhere until you ask a question or open the model list.
+
 ## Commands
 
 | Command | What it does |
@@ -110,6 +127,10 @@ Approvals and questions work for Claude Code and Codex, and Allow / Deny for Cop
 | `coucou-daemon decide <id> allow\|deny` | Answers a pending request |
 | `noctalia msg plugin coucou/mochi:daemon all toggle-pause` | Pauses or resumes Mochi |
 | `noctalia msg plugin coucou/mochi:daemon all agents` | Opens the Agents panel |
+| `noctalia msg panel-toggle coucou/mochi:chat` | Opens or closes the chat |
+| `coucou-daemon secret has\|set\|delete <provider>` | A key's presence, or saves (from stdin) / deletes it in the keyring |
+| `coucou-daemon chat --request <file>` | One chat turn, streamed as JSON lines (used by the plugin) |
+| `coucou-daemon chat-models <provider> [--base-url <url>]` | A provider's chat models as JSON |
 
 ## Development
 

@@ -15,6 +15,10 @@ The original Mochi is back.
 - `coucou-daemon install-hooks --status [--json]` and `--dry-run --json`
 - **Preview fingerprints**: `--dry-run --json` gives each file's `sha256`, and `--expect-sha256 <path>=<sha256>` refuses to write a file that changed since the preview. The Agents panel passes them when you confirm
 - **More of the original Mochi**: he falls asleep after 120 s without agent activity once the pointer is away, and hover, a click or agent work wakes him. He dances while music plays (any MPRIS player, through `playerctl` when it is installed), is surprised when a request comes up, proud with a pop when you choose an outfit, and greets you by first name. Slap and hearts are drawn over his current state's colours
+- **Chat**: Mochi's chat is back in its own panel, with Anthropic, Google AI, OpenAI, OpenRouter, Ollama, LM Studio and any OpenAI-compatible server. Answers stream in as Markdown, reasoning `<think>` blocks stay hidden, and Copy takes an answer or one of its code blocks. Click the model name to switch provider and model. The system prompt greets you by first name, and `COUCOU_ANTHROPIC_BASE_URL` points Claude at a gateway (https only). Open it from the desktop Mochi, **Chat…** in the bar panel, a quick-settings tile, or `noctalia msg panel-toggle coucou/mochi:chat` (bind it to Ctrl+Alt+Space in Hyprland)
+- **API keys in the keyring**: keys go to the Secret Service with the original app's attributes, and the panel only shows whether one is saved
+- **Files for the chat**: copy a file in the file manager, click the clip, and Mochi swallows it; the next question is about it
+- **Fix**: the service's `blip`, `close` and `peek` sounds now load (the host refuses more than eight loads at once; they now load one after the other), and the launch greeting plays once its sound is ready
 - **Sounds as in the original**: all 29 sounds ship, and they play on the original's events (a session starting, a rate limit, done, an error, a request, the decision, coming back from pause, the launch greeting). Thinking, searching and falling asleep are silent, as in the original
 
 ## Linux 0.5.0 — October 10, 2026
