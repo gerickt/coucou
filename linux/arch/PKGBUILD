@@ -1,16 +1,20 @@
 # Maintainer: gerickt
-# Coucou for Arch Linux: coucou-daemon, the coucou-hook relay and the
-# Noctalia plugin coucou/mochi, installed as a local Noctalia plugin source.
+# Coucou for Arch Linux: coucou-daemon, the coucou-hook relay, the
+# coucou-mochi overlay and the Noctalia plugin coucou/mochi, installed as a
+# local Noctalia plugin source.
 
 pkgname=coucou-git
 _pkgname=coucou
 pkgver=0.5.0
 pkgrel=1
-pkgdesc="Mochi, an animated Noctalia desktop and bar companion for AI coding agents, with approvals from the desktop"
+pkgdesc="Mochi, an animated companion for AI coding agents above your windows and in the Noctalia bar, with approvals from the desktop"
 arch=('x86_64' 'aarch64')
 url="https://github.com/gerickt/coucou"
 license=("MIT" "LicenseRef-coucou-assets")
 depends=('noctalia')
+optdepends=('pipewire: overlay sounds through pw-play (else paplay)'
+            'hyprland: the overlay follows the focused monitor and the pointer'
+            'playerctl: Mochi dances while music plays')
 makedepends=('git' 'cargo')
 provides=("$_pkgname")
 conflicts=("$_pkgname")
@@ -27,14 +31,14 @@ pkgver() {
 
 build() {
   export RUSTUP_TOOLCHAIN=stable
-  for crate in daemon hook; do
+  for crate in daemon hook overlay; do
     (cd "$_pkgname/$crate" && CARGO_TARGET_DIR="$PWD/target" cargo build --release --locked)
   done
 }
 
 check() {
   export RUSTUP_TOOLCHAIN=stable
-  for crate in daemon hook; do
+  for crate in daemon hook overlay; do
     (cd "$_pkgname/$crate" && CARGO_TARGET_DIR="$PWD/target" cargo test --release --locked)
   done
 }
@@ -43,7 +47,9 @@ package() {
   cd "$_pkgname"
   install -Dm755 daemon/target/release/coucou-daemon "$pkgdir/usr/bin/coucou-daemon"
   install -Dm755 hook/target/release/coucou-hook "$pkgdir/usr/bin/coucou-hook"
+  install -Dm755 overlay/target/release/coucou-mochi "$pkgdir/usr/bin/coucou-mochi"
   install -Dm644 daemon/coucou-daemon.service "$pkgdir/usr/lib/systemd/user/coucou-daemon.service"
+  install -Dm644 overlay/coucou-mochi.service "$pkgdir/usr/lib/systemd/user/coucou-mochi.service"
 
   # A local Noctalia plugin source: catalog.toml plus mochi/ (the directory
   # Noctalia expects for the id coucou/mochi). Add it with

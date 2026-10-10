@@ -1,0 +1,20 @@
+[Unit]
+Description=Coucou Mochi overlay: Mochi floating above the windows (wlr-layer-shell)
+Documentation=https://github.com/gerickt/coucou
+PartOf=graphical-session.target
+After=graphical-session.target
+
+# Optional: the Noctalia plugin starts coucou-mochi by itself (setting
+# mochi_surface = overlay or both). Use this unit to run it without the
+# plugin managing it; the plugin then finds it running and leaves it alone.
+# Needs WAYLAND_DISPLAY (and HYPRLAND_INSTANCE_SIGNATURE for the focused
+# monitor and the eyes) in the user manager's environment.
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/coucou-mochi
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

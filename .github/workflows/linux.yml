@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        crate: [daemon, hook]
+        crate: [daemon, hook, overlay]
     steps:
       - uses: actions/checkout@v4
       - name: Test ${{ matrix.crate }}
