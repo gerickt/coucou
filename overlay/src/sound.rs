@@ -1,5 +1,6 @@
 //! The interaction sounds the desktop widget plays (slap, annoyed, love,
-//! dizzy, hover, pop, greeting), played here when the overlay shows him. The
+//! dizzy, hover, pop, greeting, and peek when he flies home or peeks out),
+//! played here when the overlay shows him. The
 //! service keeps the agent sounds (approval, finish…), so nothing plays twice.
 //! pw-play (PipeWire), else paplay; neither installed: silence.
 
@@ -7,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 /// Only these names, so a path is never built from outside input.
-const KNOWN: [&str; 7] = ["slap", "annoyed", "love", "dizzy", "hover", "pop", "greeting"];
+const KNOWN: [&str; 8] = ["slap", "annoyed", "love", "dizzy", "hover", "pop", "greeting", "peek"];
 
 pub struct Sounds {
     dir: PathBuf,
