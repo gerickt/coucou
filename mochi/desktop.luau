@@ -308,16 +308,16 @@ local function render()
   desktopWidget.render(ui.column({ width = S, align = "center", gap = 0 }, {
     picture,
     ui.row({ width = S, align = "center", justify = "center", gap = 4 }, {
-      ui.button({ glyph = "settings", variant = "ghost", controlSize = "sm", opacity = if tools then 1 else 0,
+      ui.button({ glyph = "settings", variant = "ghost", controlSize = "sm", visible = tools,
         enabled = tools, onClick = "onSettingsClick", onRightClick = "onSettingsClick", onHover = "onMochiHover" }),
-      ui.button({ glyph = "plug-connected", variant = "ghost", controlSize = "sm", opacity = if tools then 1 else 0,
+      ui.button({ glyph = "plug-connected", variant = "ghost", controlSize = "sm", visible = tools,
         enabled = tools, onClick = "onAgentsClick", onRightClick = "onAgentsClick", onHover = "onMochiHover",
         tooltip = noctalia.tr("desktop.agents") }),
       ui.label({
         text = label, fontSize = math.max(10, S * 0.08), fontWeight = "semibold",
-        color = "on_surface", textAlign = "center", maxWidth = math.max(40, S - 112), maxLines = 1,
+        color = "on_surface", textAlign = "center", maxWidth = if tools then math.max(40, S - 112) else S, maxLines = 1,
       }),
-      ui.button({ glyph = "arrows-move", variant = "ghost", controlSize = "sm", opacity = if tools then 1 else 0,
+      ui.button({ glyph = "arrows-move", variant = "ghost", controlSize = "sm", visible = tools,
         enabled = tools, onClick = "onMoveClick", onRightClick = "onSettingsClick", onHover = "onMochiHover" }),
     }),
   }))
