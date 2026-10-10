@@ -13,8 +13,10 @@ use serde_json::{json, Map, Value};
 
 /// Largest relay line we read. coucou-hook keeps its lines well under this.
 pub const MAX_LINE: usize = 1 << 20;
-/// Longest string forwarded to the plugin. The panel shows far less.
-pub const FOLLOW_FIELD_LEN: usize = 600;
+/// Longest string forwarded to the plugin.
+/// Matches coucou-hook's own cap, so a question's text (the key its answer
+/// goes back under) reaches the panel whole.
+pub const FOLLOW_FIELD_LEN: usize = 2_000;
 
 /// One command on the control socket.
 #[derive(Debug, PartialEq)]
@@ -81,8 +83,15 @@ pub fn normalize_decision(raw: &str) -> Result<String, String> {
         Some(_) => return Err("\"answers\" must be an object".into()),
         None => map,
     };
-    if answers.is_empty() || !answers.values().all(|v| v.is_string()) {
-        return Err("answers must map each question to a label".into());
+    // A single-select answer is a label, a multi-select one a non-empty list
+    // of labels; coucou-hook then checks them against the questions asked.
+    let fits = |v: &Value| match v {
+        Value::String(_) => true,
+        Value::Array(items) => !items.is_empty() && items.iter().all(Value::is_string),
+        _ => false,
+    };
+    if answers.is_empty() || !answers.values().all(fits) {
+        return Err("answers must map each question to a label or a list of labels".into());
     }
     // serde_json never emits a raw newline, so this stays one line.
     Ok(json!({ "answers": answers }).to_string())
@@ -186,6 +195,14 @@ mod tests {
         assert!(normalize_decision(r#"{"answers":"A"}"#).is_err());
         assert!(normalize_decision(r#"{"answers":{"q":"a"},"extra":1}"#).is_err());
         assert!(normalize_decision("[]").is_err());
+    }
+
+    #[test]
+    fn multi_select_answers_are_lists_of_labels() {
+        let d = normalize_decision(r#"{"Pick?":["A","B"],"One?":"C"}"#).unwrap();
+        assert_eq!(d, r#"{"answers":{"One?":"C","Pick?":["A","B"]}}"#);
+        assert!(normalize_decision(r#"{"Pick?":[]}"#).is_err());
+        assert!(normalize_decision(r#"{"Pick?":[1]}"#).is_err());
     }
 
     #[test]
