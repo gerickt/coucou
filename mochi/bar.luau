@@ -45,7 +45,7 @@ local function render()
   local frame = player:frame()
   local tool = snap.tool
   local showTool = noctalia.getConfig("show_tool") ~= false and type(tool) == "string" and tool ~= ""
-    and state ~= "idle" and state ~= "sleeping"
+    and (state == "working" or state == "searching" or state == "approval" or state == "question")
   local key = table.concat({ tostring(frame), tostring(snap.pending ~= nil), if showTool then tool else "", tostring(snap.rev) }, "|")
   if key == lastTree then return end
   lastTree = key

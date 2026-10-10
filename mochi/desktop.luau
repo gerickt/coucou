@@ -72,12 +72,15 @@ local function baseState()
   return s
 end
 
+-- The tool name only makes sense while the agent is busy with it.
+local TOOL_STATES = { working = true, searching = true, approval = true, question = true }
+
 local function stateText()
   if snap.paused then return noctalia.tr("state.paused") end
   if not snap.daemon then return noctalia.tr("state.offline") end
   local s = if dizzy then "dizzy" else (shownState or "idle")
   local showTool = noctalia.getConfig("show_tool") ~= false
-  if showTool and type(snap.tool) == "string" and snap.tool ~= "" and s ~= "idle" and s ~= "sleeping" and s ~= "dizzy" then
+  if showTool and type(snap.tool) == "string" and snap.tool ~= "" and TOOL_STATES[s] then
     return snap.tool
   end
   return noctalia.tr("state." .. s)
