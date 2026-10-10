@@ -11,6 +11,25 @@
     "size": {
       "label": "Mochi size",
       "description": "Size of the desktop Mochi, in pixels."
+    },
+    "outfit": {
+      "label": "Outfit",
+      "description": "What Mochi wears. Auto follows the seasons (party hat, Santa hat, witch hat, bunny ears, sunglasses).",
+      "options": {
+        "auto": "Auto (seasons)",
+        "none": "None",
+        "partyHat": "Party hat",
+        "beanie": "Beanie",
+        "crown": "Crown",
+        "sunglasses": "Sunglasses",
+        "roundGlasses": "Round glasses",
+        "bow": "Bow",
+        "scarf": "Scarf",
+        "witchHat": "Witch hat",
+        "pumpkin": "Pumpkin",
+        "santaHat": "Santa hat",
+        "bunnyEars": "Bunny ears"
+      }
     }
   },
   "state": {

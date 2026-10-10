@@ -3,7 +3,8 @@ local function node(kind) return function(props, children) return { type = kind,
 ui = {}
 for _, k in { "column", "row", "scroll", "box", "label", "glyph", "image", "spacer", "button", "separator", "progress" } do ui[k] = node(k) end
 rendered = nil
-desktopWidget = { render = function(t) rendered = t end, setNeedsFrameTick = function() end }
+frameTick = false
+desktopWidget = { render = function(t) rendered = t end, setNeedsFrameTick = function(on) frameTick = on end }
 barWidget = { render = function(t) rendered = t end, setTooltip = function(t) tooltip = t end }
 panelClosed = false
 panel = { render = function(t) rendered = t end, close = function() panelClosed = true end }

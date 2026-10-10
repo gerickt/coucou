@@ -7,6 +7,8 @@
 #            IPC: noctalia msg plugin coucou/mochi:daemon all toggle-pause|pause|resume|open
 # desktop -> the big animated Mochi (click, triple click, hover reactions)
 # bar     -> mini Mochi + current tool; left click opens the panel, right click pauses
+# sprite  -> shared: plays frames/ (the original Mochi engine, pre-rendered by
+#            tools/render-mochi) and resolves the outfit setting
 # panel   -> approval card (Allow / Deny) and AskUserQuestion answers
 #
 # Needs coucou-daemon running and its hooks installed (`coucou-daemon install-hooks`).
@@ -28,6 +30,28 @@ type = "bool"
 label_key = "settings.sound_enabled.label"
 description_key = "settings.sound_enabled.description"
 default = true
+
+[[setting]]
+key = "outfit"
+type = "select"
+label_key = "settings.outfit.label"
+description_key = "settings.outfit.description"
+default = "auto"
+options = [
+  { value = "auto", label_key = "settings.outfit.options.auto" },
+  { value = "none", label_key = "settings.outfit.options.none" },
+  { value = "partyHat", label_key = "settings.outfit.options.partyHat" },
+  { value = "beanie", label_key = "settings.outfit.options.beanie" },
+  { value = "crown", label_key = "settings.outfit.options.crown" },
+  { value = "sunglasses", label_key = "settings.outfit.options.sunglasses" },
+  { value = "roundGlasses", label_key = "settings.outfit.options.roundGlasses" },
+  { value = "bow", label_key = "settings.outfit.options.bow" },
+  { value = "scarf", label_key = "settings.outfit.options.scarf" },
+  { value = "witchHat", label_key = "settings.outfit.options.witchHat" },
+  { value = "pumpkin", label_key = "settings.outfit.options.pumpkin" },
+  { value = "santaHat", label_key = "settings.outfit.options.santaHat" },
+  { value = "bunnyEars", label_key = "settings.outfit.options.bunnyEars" },
+]
 
 [[service]]
 id = "daemon"
@@ -56,7 +80,7 @@ entry = "desktop.luau"
   type = "int"
   label_key = "settings.size.label"
   description_key = "settings.size.description"
-  default = 120
+  default = 160
   min = 64
   max = 256
 

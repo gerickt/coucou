@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+The original Mochi is back.
+
+- **The original Mochi**: the desktop and bar widgets now play frames drawn by Mochi's original engine (the Windows and Linux app's `engine.ts` and `outfits.ts`, unchanged), not a redrawn copy. Same body, eyes, badges, particles, blinks, squashes and rolls, with a loop for each state
+- **Original reactions**: click = slap with annoyed eyes, three slaps in 1.7 s = dizzy double roll for 3.3 s then a happy face, hover for 1.9 s = hearts (once every 6 s), a hello wave when the widget starts, a hop for approval, a shake for errors, and a roll with sparks when a task finishes
+- **Outfits**: a new outfit setting with the 11 wardrobe outfits, None, and Auto. Auto follows the seasons: party hat, Santa hat, witch hat, bunny ears, sunglasses
+- The `annoyed`, `greet` and `hover` sounds are back
+- The desktop widget's default size is now 160 px
+- `tools/render-mochi/render.sh` regenerates the frames
+
 ## Linux 0.5.0 — October 10, 2026
 
 Mochi comes back to life on Noctalia.

@@ -16,8 +16,9 @@ agent hook ──> coucou-hook ──> $XDG_RUNTIME_DIR/coucou.sock ──> couc
 - `hook/` — `coucou-hook`, the relay each agent runs on every hook event. It forwards one JSON line to the daemon and exits at once if the daemon is not running, so an agent is never blocked.
 - `daemon/` — `coucou-daemon`, a small Rust daemon. It holds a permission request only if the plugin shows it within 800 ms, then waits up to 108 s for a click. No click means no answer, and the agent asks in its terminal as usual.
 - `mochi/` — the Noctalia plugin `coucou/mochi`:
-  - **desktop widget**: the animated Mochi. Click him and he gets annoyed. Click three times fast and he gets dizzy. Hover him for 2 s and he falls in love. When a request is waiting, a click opens the approval panel.
+  - **desktop widget**: the original animated Mochi. He greets you, then loops through each agent state. Click him and he gets annoyed. Click three times fast and he gets dizzy. Hover him for 2 s and he falls in love. When a request is waiting, a click opens the approval panel.
   - **bar widget**: a mini Mochi and the running tool. Left click opens the panel, right click pauses or resumes Mochi.
+  - **outfit setting**: Auto (follows the seasons: party hat, Santa hat, witch hat, bunny ears, sunglasses), None, or one of the 11 wardrobe outfits.
   - **panel**: Allow / Deny for permission requests, and the options of Claude Code's questions.
   - **service**: follows the daemon, keeps Mochi's state and plays his sounds.
 
@@ -104,6 +105,17 @@ Approvals and questions work for Claude Code and Codex. Gemini CLI and Antigravi
 noctalia plugins lint mochi
 LUAU=/path/to/luau mochi/tests/run.sh   # plugin specs against a mocked Noctalia host
 ```
+
+### Mochi's frames
+
+Noctalia plugins have no canvas, so the widgets play PNG frames. `mochi/frames/` is generated from the original Mochi engine: `tools/render-mochi/vendor/` holds `engine.ts`, `outfits.ts`, `anim.ts` and `fonts.ts` exactly as they were at commit 081a2ad. `render.sh` runs that engine in headless Chrome on a virtual clock, calls its own API (`setState`, `slap`, `greet`, `triggerEmote`…) and saves every frame. Then it gives each sequence one palette, removes duplicate frames and writes `mochi/frames/manifest.luau`.
+
+```
+tools/render-mochi/render.sh                       # regenerate mochi/frames (about 5 min)
+tools/render-mochi/render.sh --compare sheet.png   # also: shipped frame next to a fresh engine frame
+```
+
+It needs Node 23 or later, Chrome or Chromium (`CHROME=/path`), and Python 3 with Pillow and numpy. Pillow must be built with libimagequant. The same inputs give the same files.
 
 ## License
 
