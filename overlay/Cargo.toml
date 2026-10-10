@@ -1,0 +1,21 @@
+[package]
+name = "coucou-mochi"
+version = "0.5.0"
+edition = "2021"
+description = "Mochi floating above the windows: a wlr-layer-shell companion for the Noctalia plugin coucou/mochi"
+license = "MIT"
+
+[[bin]]
+name = "coucou-mochi"
+path = "src/main.rs"
+
+[dependencies]
+smithay-client-toolkit = { version = "0.21", default-features = false, features = ["calloop"] }
+png = "0.18"
+serde_json = "1.0"
+libc = "0.2"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true

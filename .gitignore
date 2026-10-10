@@ -6,3 +6,4 @@ linux/arch/src/
 .atl/
 .DS_Store
 hook/target/
+overlay/target/
