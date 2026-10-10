@@ -7,8 +7,8 @@
 //! coucou-daemon ack <id>              the card is on screen
 //! coucou-daemon decline <id>          nobody can act on it, hand back to the terminal
 //! coucou-daemon decide <id> <allow|deny|answers-json>
-//! coucou-daemon install-hooks [--agent claude|gemini|antigravity|codex]...
-//!               [--remove] [--yes] [--home <dir>] [--hook-path <path>]
+//! coucou-daemon install-hooks [--agent <id>]... [--remove] [--yes]
+//!               [--status | --dry-run] [--json] [--home <dir>] [--hook-path <path>]
 //! ```
 //!
 //! `COUCOU_ACK_TIMEOUT_MS` and `COUCOU_DECISION_TIMEOUT_MS` override the
@@ -25,7 +25,8 @@ mod protocol;
 mod server;
 
 const USAGE: &str = "usage: coucou-daemon [--follow | --status-json | ack <id> | decline <id> | decide <id> <allow|deny|answers-json>]
-       coucou-daemon install-hooks [--agent claude|gemini|antigravity|codex]... [--remove] [--yes] [--home <dir>] [--hook-path <path>]";
+       coucou-daemon install-hooks [--agent <id>]... [--remove] [--yes] [--status | --dry-run] [--json] [--home <dir>] [--hook-path <path>]
+       agents: claude, gemini, antigravity, codex";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
