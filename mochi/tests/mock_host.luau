@@ -51,6 +51,9 @@ noctalia = {
   },
   json = {},
 }
+notified = {}
+noctalia.tr = function(k, a) if a then local o = {} for kk, v in a do table.insert(o, kk .. "=" .. tostring(v)) end table.sort(o) return k .. "{" .. table.concat(o, ",") .. "}" end return k end
+noctalia.notify = function(t, b) table.insert(notified, { t, b }) end
 function advance(ms) clock += ms end
 function flushSounds()
   while #pendingSounds > 0 do table.remove(pendingSounds, 1)(true) end

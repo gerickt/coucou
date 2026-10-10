@@ -13,6 +13,8 @@ trap 'rm -rf "$tmp"' EXIT
 cp "$plugin/sprite.luau" "$tmp/sprite.luau"
 cp "$plugin/soundbank.luau" "$tmp/soundbank.luau"
 cp "$plugin/wardrobe.luau" "$tmp/wardrobe.luau"
+cp "$plugin/pills.luau" "$tmp/pills.luau"
+cp "$plugin/identity.luau" "$tmp/identity.luau"
 mkdir "$tmp/frames"
 cp "$plugin/frames/manifest.luau" "$tmp/frames/manifest.luau"
 status=0

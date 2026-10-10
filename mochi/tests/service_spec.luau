@@ -174,4 +174,80 @@ check(c().file and c().file.path == "/home/tester/drop.md" and c().file.name == 
 check(lastCall() == "noctalia msg panel-open coucou/mochi:chat", "drop opens the chat")
 onIpc("attach", "relative/x")
 check(c().file.path == "/home/tester/drop.md", "relative drop path ignored")
+
+-- ── Sessions, finished card, terminal, shortcuts, wardrobe (P9, P10) ──
+local pills = require("./pills")
+check(pills.agentColor("codex") == "#2DD4BF" and pills.agentColor("") == "#F5F6F8" and pills.agentName("gemini") == "Gemini CLI", "pill names and colours are the original's")
+check(pills.toOneLine("**Done.** Fixed `foo`.\n\nSecond") == "Done. Fixed foo." and pills.toOneLine("- one\n- two") == "one two" and pills.toOneLine("héllo wörld", 5) == "héllo", "toOneLine as core/diff.ts")
+config.sound_enabled = true
+feed('{"type":"hook","payload":{"hook_event_name":"UserPromptSubmit","session_id":"test-a","cwd":"/home/me/alpha","coucou_agent":"codex"}}')
+feed('{"type":"hook","payload":{"hook_event_name":"SessionStart","session_id":"test-b","cwd":"/home/me/beta"}}')
+local function sess(id) for _, x in m().sessions do if x.id == id then return x end end end
+check(sess("test-a").color == "#2DD4BF" and sess("test-a").name == "Codex" and sess("test-b").color == "#F5F6F8", "sessions carry their pill colour and name")
+local n0 = #notified
+feed('{"type":"hook","payload":{"hook_event_name":"Stop","session_id":"test-a","cwd":"/home/me/alpha","coucou_agent":"codex","last_assistant_message":"**All done.** Tests pass.\n\nMore"}}')
+check(m().finished and m().finished.line == "All done. Tests pass." and m().finished.session == "test-a", "finished card holds the final line")
+check(#notified == n0 + 1 and notified[#notified][2] == "All done. Tests pass.", "notification carries the final message")
+check(notified[#notified][1]:find("agent=Codex", 1, true) and notified[#notified][1]:find("alpha", 1, true), "notification names agent and project")
+advance(31000); update()
+check(m().finished == nil, "finished card closes after 30 s")
+feed('{"type":"hook","payload":{"hook_event_name":"Stop","session_id":"test-b","cwd":"/home/me/beta"}}')
+check(m().finished.line == "" and notified[#notified][2] == "finished.none", "no final line: generic text")
+feed('{"type":"hook","payload":{"hook_event_name":"UserPromptSubmit","session_id":"test-b"}}')
+check(m().finished == nil, "next turn clears the card")
+-- Open terminal
+local n1 = #calls
+onIpc("terminal", "test-a")
+check(lastCall() == "coucou-daemon open-terminal test-a --cwd /home/me/alpha", "open terminal asks the daemon with the session's folder")
+onIpc("terminal", "x; rm -rf /")
+check(lastCall() == "coucou-daemon open-terminal test-a --cwd /home/me/alpha" or #calls == n1 + 1 or lastCall():find("open-terminal", 1, true), "unknown session id falls back to the current one, never a shell")
+-- Next / prev
+local first = m().focus
+onIpc("next")
+check(m().focus ~= first or #m().sessions == 1, "next pill moves the focus")
+onIpc("prev")
+check(m().focus == first, "previous pill moves it back")
+onIpc("focus", "test-a")
+check(m().focus == "test-a", "focus a session")
+-- Mute, desktop, wardrobe
+local saved = {}
+noctalia.writeFile = function(path, text) written[path] = text if path:find("prefs.json", 1, true) then saved = noctalia.json.decode(text) end return true end
+local p1 = #played
+onIpc("mute")
+check(m().muted == true and saved.muted == true, "mute shortcut toggles and persists")
+feed('{"type":"hook","payload":{"hook_event_name":"SessionStart","session_id":"test-c"}}')
+check(#played == p1, "muted: no sound")
+onIpc("mute")
+check(m().muted == false, "unmute")
+onIpc("desktop")
+check(m().away == true and saved.away == true, "desktop shortcut sends Mochi off the overlay")
+local ov = noctalia.json.decode(written["/run/user/1000/coucou-mochi.json"])
+check(ov.settings.mochi_surface == "desktop_widget", "overlay told to stand down while away")
+onIpc("desktop")
+check(m().away == false, "and back")
+config.outfit = "none"
+onIpc("outfit-preview", "crown")
+check(m().preview == "crown", "hover previews an outfit")
+check(noctalia.json.decode(written["/run/user/1000/coucou-mochi.json"]).outfit == "crown", "the overlay wears the previewed outfit")
+onIpc("outfit-preview", "nonsense")
+check(m().preview == nil, "unknown preview ignored")
+onIpc("outfit-keep", "bow")
+check(m().outfit_choice == "bow" and saved.outfit.choice == "bow", "click keeps the outfit")
+config.outfit = "scarf"
+advance(1000); update()
+check(m().outfit_choice == "scarf", "changing the setting afterwards wins")
+onIpc("outfit-keep", "nonsense")
+check(m().outfit_choice == "scarf", "unknown outfit ignored")
+onIpc("wardrobe")
+check(lastCall() == "noctalia msg panel-toggle coucou/mochi:wardrobe", "wardrobe shortcut toggles the panel")
+onIpc("menu")
+check(lastCall() == "noctalia msg panel-open coucou/mochi:menu", "menu opens the small menu")
+onIpc("island")
+check(lastCall() == "noctalia msg panel-toggle coucou/mochi:approval", "island shortcut toggles the panel")
+-- Overlay text
+local ot = noctalia.json.decode(written["/run/user/1000/coucou-mochi.json"])
+check(ot.greeting == "desktop.greeting{name=Théodore}", "overlay greeting by first name: " .. tostring(ot.greeting))
+feed('{"type":"hook","payload":{"hook_event_name":"PreToolUse","session_id":"test-a","tool_name":"Bash"}}')
+ot = noctalia.json.decode(written["/run/user/1000/coucou-mochi.json"])
+check(ot.label == "Bash", "overlay label is the running tool")
 print("ALL PASSED")

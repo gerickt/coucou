@@ -63,6 +63,14 @@
     "overlay_open_on_hover": {
       "label": "Open on hover",
       "description": "While he peeks from the top edge, hovering him opens the approval panel."
+    },
+    "overlay_show_text": {
+      "label": "Text under Mochi",
+      "description": "Write the greeting and the running tool under Mochi on the overlay."
+    },
+    "notify_finished": {
+      "label": "Notify when a session finishes",
+      "description": "Show the agent's final message in a notification."
     }
   },
   "state": {
@@ -174,5 +182,11 @@
   },
   "shortcut": {
     "chat": "Mochi chat"
+  },
+  "finished": {
+    "title": "{agent} finished",
+    "none": "Session finished",
+    "open_terminal": "Open terminal",
+    "ok": "OK"
   }
 }

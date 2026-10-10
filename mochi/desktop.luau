@@ -22,8 +22,9 @@
 --   him; paused, he sleeps;
 -- - he dances while music plays (the service's playerctl follow), in the
 --   dance states (core/spotify.ts desktopDances); dancing keeps him awake;
--- - the outfit setting dresses him ("auto" follows the seasons); choosing an
---   outfit makes him proud with a pop (island.ts chooseOutfit).
+-- - the outfit setting dresses him ("auto" follows the seasons), or the outfit
+--   kept in the wardrobe panel; choosing one makes him proud with a pop
+--   (island.ts chooseOutfit), and the wardrobe's hover tries one on.
 --
 -- No random idle emotes: the original's main Mochi has none (the engine's
 -- doMiniBehaviorLoop only runs for mini bots).
@@ -65,7 +66,14 @@ local GREETING_SECS = 3.5
 -- The global sound switch is a plugin-level setting, readable from here too.
 local okBank, soundbank = pcall(require, "./soundbank.luau")
 if not okBank then soundbank = require("./soundbank") end
-local play = soundbank.new(noctalia, { "slap", "annoyed", "love", "dizzy", "hover", "pop", "greeting" }, function() return noctalia.getConfig("sound_enabled") ~= false end)
+local okIdentity, identity = pcall(require, "./identity.luau")
+if not okIdentity then identity = require("./identity") end
+-- Muted from the shortcut (the service's "mute" pref) or the setting.
+local function soundOn()
+  local st = noctalia.state.get("mochi")
+  return noctalia.getConfig("sound_enabled") ~= false and not (type(st) == "table" and st.muted == true)
+end
+local play = soundbank.new(noctalia, { "slap", "annoyed", "love", "dizzy", "hover", "pop", "greeting" }, soundOn)
 
 -- ── Model ────────────────────────────────────────────────────────────────────
 
@@ -114,36 +122,15 @@ local function loopFor(s)
   return s
 end
 
--- ── First name (identity.rs first_name_from) ─────────────────────────────────
+-- ── First name (identity.rs first_name_from, identity.luau) ─────────────────
 
-local function isHandle(name)
-  if name:find(" ", 1, true) then return false end
-  return name:lower() == name or name:find("[%d%._%-@]") ~= nil
-end
-
---- "Théodore Riant" -> "Théodore"; a login handle or an odd name -> nil.
-function firstNameFrom(full)
-  if type(full) ~= "string" then return nil end
-  full = full:match("^%s*(.-)%s*$")
-  local count = utf8.len(full) or #full
-  if full == "" or count > 32 or isHandle(full) then return nil end
-  local first = full:match("^([^ ]+)")
-  -- Letters (any non-ASCII byte counts as part of a letter), ' and -.
-  if not first or first:find("[^%a\128-\255'%-]") then return nil end
-  return first
-end
+firstNameFrom = identity.firstNameFrom
 
 local function readFirstName()
-  local user = noctalia.getenv and noctalia.getenv("USER")
-  if type(user) ~= "string" or not user:match("^[%w%._%-]+$") then return end
-  noctalia.runAsync({ "getent", "passwd", user }, function(res)
-    if res.exitCode ~= 0 or type(res.stdout) ~= "string" then return end
-    -- name:password:uid:gid:GECOS:home:shell; the full name is GECOS up to a comma.
-    local gecos = res.stdout:match("^[^:\n]*:[^:\n]*:[^:\n]*:[^:\n]*:([^:\n]*)")
-    if not gecos then return end
-    firstName = firstNameFrom(gecos:match("^([^,]*)"))
+  identity.read(noctalia, function(name)
+    firstName = name
     dirty = true
-  end, 2000)
+  end)
 end
 
 -- The tool name only makes sense while the agent is busy with it.
@@ -166,8 +153,10 @@ local function sync()
     -- Settings (outfit, size, show_tool) are re-read once a second.
     outfitCheckAt = t + 1
     dirty = true
-    local choice = noctalia.getConfig("outfit")
-    local outfit = sprite.resolveOutfit(choice)
+    -- The wardrobe's kept outfit (the service owns it) wins over the setting;
+    -- an outfit the pointer rests on in the wardrobe is tried on.
+    local choice = if type(snap.outfit_choice) == "string" then snap.outfit_choice else noctalia.getConfig("outfit")
+    local outfit = if type(snap.preview) == "string" and snap.preview ~= "" then snap.preview else sprite.resolveOutfit(choice)
     if outfit ~= player.outfit then
       player:setOutfit(outfit)
       dirty = true
@@ -443,7 +432,11 @@ local function readReaction()
 end
 
 local function readSnap(v)
-  if type(v) == "table" then snap = v end
+  if type(v) == "table" then
+    -- A wardrobe preview or a kept outfit shows at once, not at the next second.
+    if v.preview ~= snap.preview or v.outfit_choice ~= snap.outfit_choice then outfitCheckAt = -1 end
+    snap = v
+  end
   readReaction()
   dirty = true
   wake()

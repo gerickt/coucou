@@ -119,6 +119,20 @@ label_key = "settings.overlay_open_on_hover.label"
 description_key = "settings.overlay_open_on_hover.description"
 default = false
 
+[[setting]]
+key = "overlay_show_text"
+type = "bool"
+label_key = "settings.overlay_show_text.label"
+description_key = "settings.overlay_show_text.description"
+default = true
+
+[[setting]]
+key = "notify_finished"
+type = "bool"
+label_key = "settings.notify_finished.label"
+description_key = "settings.notify_finished.description"
+default = true
+
 [[service]]
 id = "daemon"
 entry = "service.luau"
