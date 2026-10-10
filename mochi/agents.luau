@@ -7,7 +7,9 @@
 -- (connected). Connect / Disconnect first shows the exact change
 -- (`--dry-run --json`: the diff and where the backup goes); only a click on
 -- the confirm button of that preview writes, with
--- `coucou-daemon install-hooks --agent <id> --yes [--remove]` (argv, no shell).
+-- `coucou-daemon install-hooks --agent <id> --yes [--remove]
+-- --expect-sha256 <path>=<sha256>...` (argv, no shell): the fingerprints the
+-- preview showed, so a file edited since the preview is refused, not written.
 -- The daemon takes the dated backup and writes atomically.
 
 local DAEMON = "coucou-daemon"
@@ -95,6 +97,16 @@ local function showPreview(id, remove)
       preview.changed = entry.changed == true
       preview.diff = if type(entry.diff) == "string" then entry.diff else ""
       preview.backup = if type(entry.backup_path) == "string" then entry.backup_path else nil
+      -- The fingerprint of every file the preview was computed from: confirm
+      -- passes them back, and the daemon refuses a file changed since.
+      preview.expect = {}
+      for _, f in (if type(entry.files) == "table" then entry.files else {}) do
+        local sha = type(f) == "table" and f.sha256
+        if type(f.path) == "string" and f.path ~= "" and type(sha) == "string"
+          and (sha == "absent" or sha:match("^%x+$")) then
+          table.insert(preview.expect, f.path .. "=" .. sha)
+        end
+      end
     end
     render()
   end)
@@ -108,6 +120,10 @@ function onConfirm()
   render()
   local args = { "--agent", p.id, "--yes" }
   if p.remove then table.insert(args, "--remove") end
+  for _, e in p.expect or {} do
+    table.insert(args, "--expect-sha256")
+    table.insert(args, e)
+  end
   hooks(args, function(res)
     busy = false
     preview = nil

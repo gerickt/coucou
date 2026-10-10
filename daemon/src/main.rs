@@ -9,6 +9,7 @@
 //! coucou-daemon decide <id> <allow|deny|answers-json>
 //! coucou-daemon install-hooks [--agent <id>]... [--remove] [--yes]
 //!               [--status | --dry-run] [--json] [--home <dir>] [--hook-path <path>]
+//!               [--expect-sha256 <path>=<sha256>]...
 //! ```
 //!
 //! `COUCOU_ACK_TIMEOUT_MS` and `COUCOU_DECISION_TIMEOUT_MS` override the
@@ -25,7 +26,7 @@ mod protocol;
 mod server;
 
 const USAGE: &str = "usage: coucou-daemon [--follow | --status-json | ack <id> | decline <id> | decide <id> <allow|deny|answers-json>]
-       coucou-daemon install-hooks [--agent <id>]... [--remove] [--yes] [--status | --dry-run] [--json] [--home <dir>] [--hook-path <path>]
+       coucou-daemon install-hooks [--agent <id>]... [--remove] [--yes] [--status | --dry-run] [--json] [--home <dir>] [--hook-path <path>] [--expect-sha256 <path>=<sha256>]...
        agents: claude, codex, copilot, muse, gemini, antigravity, cursor, opencode, amp, hermes";
 
 fn main() -> ExitCode {

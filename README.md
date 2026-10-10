@@ -96,7 +96,7 @@ coucou-daemon install-hooks --status [--json]    # installed / connected, per ag
 coucou-daemon install-hooks --dry-run --json --agent cursor  # the diff and backup path, nothing written
 ```
 
-Each run shows the diff and asks before writing. It keeps a dated backup (`settings.json.coucou-backup-YYYYMMDD-HHMMSS`) and leaves every other hook untouched. `--yes` skips the question, and `--remove` takes Coucou's hooks out again. OpenCode, Amp and Hermes get a plugin file of Coucou's own; a file of the same name that Coucou did not write is never touched. Hermes needs `hermes plugins enable coucou` once.
+Each run shows the diff and asks before writing. It keeps a dated backup (`settings.json.coucou-backup-YYYYMMDD-HHMMSS`) and leaves every other hook untouched. `--yes` skips the question, and `--remove` takes Coucou's hooks out again. `--dry-run --json` also gives each file's `sha256` (`absent` for a file that does not exist yet); passing them back with `--expect-sha256 <path>=<sha256>` makes the write refuse a file that changed since that preview (the Agents panel does this). OpenCode, Amp and Hermes get a plugin file of Coucou's own; a file of the same name that Coucou did not write is never touched. Hermes needs `hermes plugins enable coucou` once.
 
 Approvals and questions work for Claude Code and Codex, and Allow / Deny for Copilot CLI and Muse Code. The other agents show their activity, and their prompts stay in their own terminal.
 

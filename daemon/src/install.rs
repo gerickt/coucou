@@ -4,7 +4,9 @@
 //! else's entries, show the diff, take a dated backup, and write only after an
 //! explicit "yes" (or `--yes`). `--remove` takes Coucou's entries out and
 //! nothing else. A config whose `hooks` has an unexpected shape is refused,
-//! never replaced.
+//! never replaced. `--dry-run --json` gives each file's `sha256` (or
+//! "absent"); passing them back as `--expect-sha256 <path>=<hash>` makes the
+//! write refuse any file that changed since that preview.
 
 use std::io::{self, BufRead, Write};
 use std::ffi::OsStr;
@@ -580,6 +582,65 @@ pub fn diff(old: &str, new: &str) -> String {
     out
 }
 
+/// The fingerprint `--dry-run --json` gives a file that does not exist.
+pub const ABSENT: &str = "absent";
+
+/// SHA-256 of `data`, lowercase hex (FIPS 180-4). Small enough to keep the
+/// daemon free of a crypto dependency; it only fingerprints config files.
+pub fn sha256_hex(data: &[u8]) -> String {
+    const K: [u32; 64] = [
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+        0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+        0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+        0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+        0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+    ];
+    let mut h: [u32; 8] = [
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+    ];
+    let mut msg = data.to_vec();
+    msg.push(0x80);
+    while msg.len() % 64 != 56 {
+        msg.push(0);
+    }
+    msg.extend_from_slice(&((data.len() as u64).wrapping_mul(8)).to_be_bytes());
+    for block in msg.chunks_exact(64) {
+        let mut w = [0u32; 64];
+        for (i, word) in block.chunks_exact(4).enumerate() {
+            w[i] = u32::from_be_bytes([word[0], word[1], word[2], word[3]]);
+        }
+        for i in 16..64 {
+            let s0 = w[i - 15].rotate_right(7) ^ w[i - 15].rotate_right(18) ^ (w[i - 15] >> 3);
+            let s1 = w[i - 2].rotate_right(17) ^ w[i - 2].rotate_right(19) ^ (w[i - 2] >> 10);
+            w[i] = w[i - 16].wrapping_add(s0).wrapping_add(w[i - 7]).wrapping_add(s1);
+        }
+        let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut hh] = h;
+        for i in 0..64 {
+            let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
+            let ch = (e & f) ^ (!e & g);
+            let t1 = hh.wrapping_add(s1).wrapping_add(ch).wrapping_add(K[i]).wrapping_add(w[i]);
+            let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
+            let maj = (a & b) ^ (a & c) ^ (b & c);
+            let t2 = s0.wrapping_add(maj);
+            hh = g;
+            g = f;
+            f = e;
+            e = d.wrapping_add(t1);
+            d = c;
+            c = b;
+            b = a;
+            a = t1.wrapping_add(t2);
+        }
+        for (x, y) in h.iter_mut().zip([a, b, c, d, e, f, g, hh]) {
+            *x = x.wrapping_add(y);
+        }
+    }
+    h.iter().map(|x| format!("{x:08x}")).collect()
+}
+
 /// What one run would do to one file.
 #[derive(Debug)]
 pub struct Plan {
@@ -593,6 +654,14 @@ pub struct Plan {
 impl Plan {
     pub fn changes(&self) -> bool {
         self.before != self.after
+    }
+
+    /// SHA-256 of the bytes the plan was computed from, or [`ABSENT`].
+    pub fn fingerprint(&self) -> String {
+        match &self.before {
+            Some(text) => sha256_hex(text.as_bytes()),
+            None => ABSENT.to_string(),
+        }
     }
 
     /// `--- path` / `+++ path` then the line diff, or "" when nothing changes.
@@ -900,7 +969,7 @@ pub fn dry_run_json(agents: &[Agent], home: &Path, relay: &str, remove: bool, un
                     .iter()
                     .map(|p| {
                         let backup = (p.changes() && p.before.is_some()).then(|| free_backup_path(&p.path, unix_secs));
-                        json!({ "path": p.path, "changed": p.changes(), "backup_path": backup })
+                        json!({ "path": p.path, "changed": p.changes(), "backup_path": backup, "sha256": p.fingerprint() })
                     })
                     .collect();
                 let backup = files.iter().find_map(|f| f["backup_path"].as_str().map(str::to_string));
@@ -940,6 +1009,9 @@ pub struct Options {
     pub relay: String,
     pub mode: Mode,
     pub json: bool,
+    /// `--expect-sha256 <path>=<hash>`: the fingerprints a preview showed.
+    /// When given, every file to write must be listed and still match.
+    pub expect: Vec<(PathBuf, String)>,
 }
 
 pub fn parse_args(args: &[String]) -> Result<Options, String> {
@@ -950,6 +1022,7 @@ pub fn parse_args(args: &[String]) -> Result<Options, String> {
     let mut mode = Mode::Apply;
     let mut home = std::env::var_os("HOME").map(PathBuf::from);
     let mut relay = None;
+    let mut expect = Vec::new();
     let mut it = args.iter();
     let mut set_mode = |m: Mode| {
         if mode != Mode::Apply {
@@ -975,11 +1048,22 @@ pub fn parse_args(args: &[String]) -> Result<Options, String> {
             }
             "--home" => home = Some(PathBuf::from(it.next().ok_or("--home needs a value")?)),
             "--hook-path" => relay = Some(it.next().ok_or("--hook-path needs a value")?.clone()),
+            "--expect-sha256" => {
+                let value = it.next().filter(|v| !v.starts_with("--")).ok_or("--expect-sha256 needs <path>=<sha256>")?;
+                let (path, hash) = value.rsplit_once('=').ok_or("--expect-sha256 needs <path>=<sha256>")?;
+                if path.is_empty() || hash.is_empty() {
+                    return Err("--expect-sha256 needs <path>=<sha256>".into());
+                }
+                expect.push((PathBuf::from(path), hash.to_string()));
+            }
             other => return Err(format!("unknown option: {other}")),
         }
     }
     if json && mode == Mode::Apply {
         return Err("--json goes with --status or --dry-run".into());
+    }
+    if !expect.is_empty() && mode != Mode::Apply {
+        return Err("--expect-sha256 goes with writing, not --status or --dry-run".into());
     }
     if agents.is_empty() {
         // Writing defaults to Claude Code alone; looking defaults to everyone.
@@ -993,7 +1077,28 @@ pub fn parse_args(args: &[String]) -> Result<Options, String> {
         relay: relay.unwrap_or_else(default_relay),
         mode,
         json,
+        expect,
     })
+}
+
+/// With fingerprints from a preview, refuses when a file to write is not
+/// among them or no longer matches: the user confirmed another diff.
+fn check_expected(plans: &[Plan], expect: &[(PathBuf, String)]) -> Result<(), String> {
+    if expect.is_empty() {
+        return Ok(());
+    }
+    for plan in plans.iter().filter(|p| p.changes()) {
+        let Some((_, hash)) = expect.iter().find(|(path, _)| path == &plan.path) else {
+            return Err(format!("{} was not in the preview; Coucou has not touched it", plan.path.display()));
+        };
+        if *hash != plan.fingerprint() {
+            return Err(format!(
+                "{} changed since the preview; Coucou has not touched it (preview again)",
+                plan.path.display()
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn now_secs() -> u64 {
@@ -1035,6 +1140,9 @@ pub fn run(opts: &Options, input: &mut impl BufRead, out: &mut impl Write) -> Re
     }
     for agent in &opts.agents {
         let plans = plans(*agent, &opts.home, &opts.relay, opts.remove)?;
+        if opts.mode == Mode::Apply {
+            check_expected(&plans, &opts.expect)?;
+        }
         if !plans.iter().any(Plan::changes) {
             writeln!(out, "{}: {} is already up to date", agent.id(), plans[0].path.display()).map_err(io_err)?;
             continue;
@@ -1333,6 +1441,7 @@ mod tests {
             relay: relay.into(),
             mode: Mode::Apply,
             json: false,
+            expect: Vec::new(),
         };
         run(&opts, &mut "".as_bytes(), &mut out).unwrap();
         // The plugin files are gone; only their dated backups stay (the folder
@@ -1483,6 +1592,7 @@ mod tests {
             relay: RELAY.into(),
             mode: Mode::Apply,
             json: false,
+            expect: Vec::new(),
         };
         let mut out = Vec::new();
         run(&opts, &mut "n\n".as_bytes(), &mut out).unwrap();
@@ -1494,6 +1604,100 @@ mod tests {
         let mut out = Vec::new();
         run(&opts, &mut "y\n".as_bytes(), &mut out).unwrap();
         assert!(Agent::Claude.file(&home).is_file());
+        std::fs::remove_dir_all(&home).unwrap();
+    }
+
+    #[test]
+    fn sha256_matches_the_standard_vectors() {
+        assert_eq!(sha256_hex(b""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+        assert_eq!(sha256_hex(b"abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        assert_eq!(
+            sha256_hex(b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"),
+            "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"
+        );
+        assert_eq!(
+            sha256_hex(&vec![b'a'; 1_000_000]),
+            "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"
+        );
+    }
+
+    #[test]
+    fn dry_run_reports_each_file_fingerprint() {
+        let home = temp_home("fingerprint");
+        let file = Agent::Claude.file(&home);
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, "{\"model\":\"opus\"}\n").unwrap();
+        let v = dry_run_json(&[Agent::Claude, Agent::Codex], &home, RELAY, false, 0);
+        assert_eq!(v["agents"][0]["files"][0]["sha256"], sha256_hex(b"{\"model\":\"opus\"}\n").as_str());
+        // A file that does not exist yet has the "absent" fingerprint.
+        assert_eq!(v["agents"][1]["files"][0]["sha256"], ABSENT);
+        std::fs::remove_dir_all(&home).unwrap();
+    }
+
+    #[test]
+    fn expect_sha256_parses_and_goes_with_writing_only() {
+        let o = parse_args(&args(&["--agent", "claude", "--yes", "--expect-sha256", "/h/.claude/settings.json=abc", "--home", "/h"])).unwrap();
+        assert_eq!(o.expect, vec![(PathBuf::from("/h/.claude/settings.json"), "abc".to_string())]);
+        // The path may itself hold '=': the hash is after the last one.
+        let o = parse_args(&args(&["--expect-sha256", "/h/a=b.json=absent", "--home", "/h"])).unwrap();
+        assert_eq!(o.expect, vec![(PathBuf::from("/h/a=b.json"), "absent".to_string())]);
+        assert!(parse_args(&args(&["--expect-sha256", "nohash", "--home", "/h"])).is_err());
+        assert!(parse_args(&args(&["--expect-sha256", "--home", "/h"])).is_err());
+        assert!(parse_args(&args(&["--dry-run", "--expect-sha256", "/x=abc", "--home", "/h"])).is_err());
+    }
+
+    fn apply_opts(home: &Path, expect: Vec<(PathBuf, String)>) -> Options {
+        Options {
+            agents: vec![Agent::Claude],
+            yes: true,
+            remove: false,
+            home: home.to_path_buf(),
+            relay: RELAY.into(),
+            mode: Mode::Apply,
+            json: false,
+            expect,
+        }
+    }
+
+    #[test]
+    fn a_file_changed_since_the_preview_is_never_written() {
+        let home = temp_home("expect");
+        let file = Agent::Claude.file(&home);
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, "{\"model\":\"opus\"}\n").unwrap();
+        let previewed = dry_run_json(&[Agent::Claude], &home, RELAY, false, 0);
+        let hash = previewed["agents"][0]["files"][0]["sha256"].as_str().unwrap().to_string();
+
+        // Someone edits the file between the preview and the click.
+        std::fs::write(&file, "{\"model\":\"sonnet\"}\n").unwrap();
+        let err = run(&apply_opts(&home, vec![(file.clone(), hash.clone())]), &mut "".as_bytes(), &mut Vec::new()).unwrap_err();
+        assert!(err.contains("changed since the preview"), "{err}");
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "{\"model\":\"sonnet\"}\n");
+        let backups = std::fs::read_dir(file.parent().unwrap()).unwrap().count();
+        assert_eq!(backups, 1, "no backup either");
+
+        // A file to write that the preview did not fingerprint is refused too.
+        let other = home.join("elsewhere.json");
+        let err = run(&apply_opts(&home, vec![(other, hash)]), &mut "".as_bytes(), &mut Vec::new()).unwrap_err();
+        assert!(err.contains("not in the preview"), "{err}");
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "{\"model\":\"sonnet\"}\n");
+
+        // The fingerprint of what is on disk now: written.
+        let now = sha256_hex(b"{\"model\":\"sonnet\"}\n");
+        run(&apply_opts(&home, vec![(file.clone(), now)]), &mut "".as_bytes(), &mut Vec::new()).unwrap();
+        assert!(std::fs::read_to_string(&file).unwrap().contains("coucou-hook"));
+        std::fs::remove_dir_all(&home).unwrap();
+    }
+
+    #[test]
+    fn a_file_created_since_the_preview_is_never_written() {
+        let home = temp_home("expect-absent");
+        let file = Agent::Claude.file(&home);
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, "{}\n").unwrap();
+        let err = run(&apply_opts(&home, vec![(file.clone(), ABSENT.into())]), &mut "".as_bytes(), &mut Vec::new()).unwrap_err();
+        assert!(err.contains("changed since the preview"), "{err}");
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "{}\n");
         std::fs::remove_dir_all(&home).unwrap();
     }
 }
