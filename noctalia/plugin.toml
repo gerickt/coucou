@@ -1,13 +1,33 @@
+# Mochi for Noctalia: a little animated character that follows your AI coding
+# agent sessions (Claude Code, Gemini CLI, Antigravity, Codex) and lets you
+# approve permission requests or answer questions from the desktop.
+#
+# service -> follows `coucou-daemon --follow`, runs Mochi's state machine,
+#            plays sounds, publishes everything to noctalia.state ("mochi")
+#            IPC: noctalia msg plugin coucou/mochi:daemon all toggle-pause|pause|resume|open
+# desktop -> the big animated Mochi (click, triple click, hover reactions)
+# bar     -> mini Mochi + current tool; left click opens the panel, right click pauses
+# panel   -> approval card (Allow / Deny) and AskUserQuestion answers
+#
+# Needs coucou-daemon running and its hooks installed (`coucou-daemon install-hooks`).
+
 id = "coucou/mochi"
 name = "Mochi"
-version = "0.4.0"
-plugin_api = 22
+version = "0.5.0"
+plugin_api = 24
 author = "gerickt"
 license = "MIT"
-icon = "bot"
-description = "Mochi keeps an eye on your Claude Code and AI agent sessions right in your Noctalia bar."
-tags = ["bar", "panel", "ai", "indicator", "agent", "utility"]
-dependencies = ["coucou-daemon", "xdg-open"]
+icon = "mood-smile"
+description = "Mochi watches your Claude Code and AI agent sessions from the desktop and the bar, and lets you approve or answer them with a click."
+tags = ["ai", "agent", "desktop", "bar", "panel", "productivity"]
+dependencies = ["coucou-daemon", "coucou-hook"]
+
+[[setting]]
+key = "sound_enabled"
+type = "bool"
+label_key = "settings.sound_enabled.label"
+description_key = "settings.sound_enabled.description"
+default = true
 
 [[service]]
 id = "daemon"
@@ -20,16 +40,35 @@ entry = "bar.luau"
   [widget.actions]
   right = "plugin coucou/mochi:daemon all toggle-pause"
 
-[[widget.setting]]
-key = "show_label"
-type = "boolean"
-label_key = "settings.show_label.label"
-description_key = "settings.show_label.description"
-default = false
+  [[widget.setting]]
+  key = "show_tool"
+  type = "bool"
+  label_key = "settings.show_tool.label"
+  description_key = "settings.show_tool.description"
+  default = true
 
-[[widget.setting]]
-key = "show_tool"
-type = "boolean"
-label_key = "settings.show_tool.label"
-description_key = "settings.show_tool.description"
-default = true
+[[desktop_widget]]
+id = "desktop"
+entry = "desktop.luau"
+
+  [[desktop_widget.setting]]
+  key = "size"
+  type = "int"
+  label_key = "settings.size.label"
+  description_key = "settings.size.description"
+  default = 120
+  min = 64
+  max = 256
+
+  [[desktop_widget.setting]]
+  key = "show_tool"
+  type = "bool"
+  label_key = "settings.show_tool.label"
+  description_key = "settings.show_tool.description"
+  default = true
+
+[[panel]]
+id = "approval"
+entry = "panel.luau"
+width = 440
+height = 420

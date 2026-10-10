@@ -1,21 +1,45 @@
 {
   "settings": {
-    "show_label": {
-      "label": "Show label",
-      "description": "Show the 'Mochi' text label next to the avatar."
+    "sound_enabled": {
+      "label": "Sounds",
+      "description": "Play Mochi's sounds on state changes and reactions."
     },
     "show_tool": {
       "label": "Show active tool",
-      "description": "Show the tool currently running (e.g. bash, edit) beside Mochi."
+      "description": "Show the tool the agent is running (Bash, Edit…) next to Mochi."
+    },
+    "size": {
+      "label": "Mochi size",
+      "description": "Size of the desktop Mochi, in pixels."
     }
   },
-  "ui": {
+  "state": {
     "idle": "Idle",
+    "working": "Working",
     "thinking": "Thinking…",
-    "running": "Running tool",
-    "permission": "Approval needed",
-    "done": "Finished",
+    "searching": "Searching",
+    "approval": "Approval needed",
+    "question": "Question",
+    "error": "Error",
+    "finished": "Done",
+    "ratelimit": "Rate limited",
+    "sleeping": "Sleeping",
+    "dizzy": "Dizzy",
     "paused": "Paused",
-    "error": "Error"
+    "offline": "Daemon offline"
+  },
+  "panel": {
+    "wants": "Allow {tool}?",
+    "asks": "{agent} asks",
+    "allow": "Allow",
+    "deny": "Deny",
+    "submit": "Send answer",
+    "terminal": "Answer in terminal",
+    "multi_hint": "Pick one or more.",
+    "empty": "Nothing waiting for you.",
+    "offline": "coucou-daemon is not running.",
+    "recent": "Recent sessions",
+    "no_sessions": "No sessions yet.",
+    "send_failed": "Could not reach coucou-daemon; the agent will ask in its terminal."
   }
 }
