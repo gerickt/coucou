@@ -26,11 +26,11 @@ Chat providers, GitHub, Spotify, weekly recap, plan usage, file drop, diff viewe
 - [x] T2 Hook installer with backup/diff/confirm + tests — route: delegated — 45128cd
 - [x] T3 Plugin: service + desktop Mochi + bar + panel + sounds + manifest/lint — route: delegated — fe1f852
 - [x] T4 Packaging: catalog.toml, PKGBUILD, README install-as-plugin — route: delegated — be54766 (git-source layout gap, see Progress)
-- [ ] T5 Live validation on Hyprland/Noctalia: fake hook events, screenshot, approve/deny round trip — route: parent
+- [x] T5 Live validation on Hyprland/Noctalia: fake hook events, screenshot, approve/deny round trip — route: parent (inline: state checks and one CPU fix)
 
 ## Acceptance criteria
 - `cargo test` and `cargo build --release` pass for daemon and hook.
-- `noctalia plugins lint noctalia/` passes.
+- `noctalia plugins lint mochi` passes.
 - A fake PermissionRequest piped through `coucou-hook` shows Mochi in approval state and the panel; clicking Allow returns the allow JSON to the hook; no click returns silence after timeout.
 - Mochi visible and animated on the desktop; click/hover reactions observed.
 
@@ -56,5 +56,13 @@ Chat providers, GitHub, Spotify, weekly recap, plan usage, file drop, diff viewe
 - Sounds, the Mochi name and character are under `LICENSE-ASSETS.md` (not MIT); distributing them in a public plugin source needs the owner's permission.
 - Engram mirror `odd/mochi-noctalia-parity/tasks`: pending (worker did not write it).
 
+### T5 live validation (2026-10-10, Noctalia 5.2.1, Hyprland 0.56.2)
+- Plugin moved to `mochi/` (d5bdb4f); loaded from local source `noctalia msg plugins source add coucou path <repo>`: log `loaded plugin 'coucou/mochi' (4 entries)`, service started, 14 sounds loaded, `coucou-daemon --follow` attached.
+- Desktop widget via `[desktop_widgets.widget.mochi_main] type = "coucou/mochi:desktop"`: layer surface 240x250 on Bottom layer; screenshots show idle, approval (!), thinking (dots), finished (^ ^), question (?) and the working state animating between frames.
+- PermissionRequest: panel "Allow Bash?" with command, Deny/Allow; `decide <id> allow` (the Allow button's call) -> hook printed the allow JSON. A second concurrent request was declined (silence, terminal asks).
+- AskUserQuestion: panel with options; answer -> hook printed allow + updatedInput.answers.
+- CPU: desktop Mochi cost ~8 points idle at 30 fps; now drops frame ticks when calm and steps from update() at 8 Hz: 3.2% total vs 1.4% with desktop widgets hidden.
+- Not verified: real mouse clicks/hover (no ydotool/wtype to inject input), sound playback audibility, multi-select UI.
+
 ## Next step
-T5 live validation (parent).
+User: click-test Mochi (click, triple click, hover 2 s) and Allow/Deny; run `coucou-daemon install-hooks` to wire real agents; push and decide on asset licence before publishing the source.

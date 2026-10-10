@@ -81,6 +81,7 @@ local lovedThisHover = false
 
 local function readSnap(v)
   if type(v) == "table" then snap = v end
+  if wake then wake() end
 end
 
 readSnap(noctalia.state.get("mochi"))
@@ -104,6 +105,7 @@ end
 -- ── Interactions ─────────────────────────────────────────────────────────────
 
 function onMochiClick()
+  wake()
   table.insert(clicks, t)
   while #clicks > 0 and t - clicks[1] > 1.0 do table.remove(clicks, 1) end
   if #clicks >= 3 then
@@ -125,6 +127,7 @@ function onMochiClick()
 end
 
 function onMochiHover(state)
+  wake()
   if state == "true" then
     hoverSince = t
     lovedThisHover = false
@@ -300,9 +303,26 @@ local function render()
 end
 
 -- ── Frame loop ───────────────────────────────────────────────────────────────
+--
+-- Per-frame ticks only while something moves (squash, blink, emote, hover,
+-- colour easing, busy badges). A calm idle, sleeping or finished Mochi drops
+-- the frame tick and steps from update() at 8 Hz, which keeps the gentle bob
+-- while costing next to nothing.
 
-function onFrameTick(dt)
-  local secs = (tonumber(dt) or 16) / 1000
+local ticking = false
+local lastStepMs = noctalia.nowMs()
+
+local function setTicking(on)
+  if on == ticking then return end
+  ticking = on
+  desktopWidget.setNeedsFrameTick(on)
+end
+
+function wake()
+  setTicking(true)
+end
+
+local function step(secs)
   t += secs
 
   local state = snap.state or "idle"
@@ -333,13 +353,32 @@ function onFrameTick(dt)
     end
   end
 
+  local busy = t - squashAt < 0.8 or t - blinkAt < 0.3 or emote ~= nil or hoverSince ~= nil
+    or t < dizzyUntil or math.abs(tint - cfg.tint) > 0.01
+    or (shownState ~= "idle" and shownState ~= "sleeping" and shownState ~= "finished")
+  setTicking(busy)
+
   -- About 30 frames a second is plenty for this kind of motion.
   sinceRender += secs
-  if sinceRender >= 0.033 then
+  if not busy or sinceRender >= 0.033 then
     sinceRender = 0
     render()
   end
 end
 
+function onFrameTick(dt)
+  lastStepMs = noctalia.nowMs()
+  step((tonumber(dt) or 16) / 1000)
+end
+
+function update()
+  if ticking then return end
+  local now = noctalia.nowMs()
+  local secs = math.clamp((now - lastStepMs) / 1000, 0, 0.5)
+  lastStepMs = now
+  step(secs)
+end
+
 render()
-desktopWidget.setNeedsFrameTick(true)
+noctalia.setUpdateInterval(125)
+wake()
