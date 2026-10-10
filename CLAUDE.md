@@ -5,7 +5,7 @@ Linux-only fork of Coucou for Hyprland + Noctalia. Mochi lives on the Noctalia d
 ## Where things are
 - `hook/` — `coucou-hook` (Rust, serde_json + libc): the relay agents run on each hook event; one JSON line to `$XDG_RUNTIME_DIR/coucou.sock`, reply printed in each agent's format (`reply.rs`).
 - `daemon/` — `coucou-daemon` (Rust, serde_json + libc): relay socket, control socket `coucou-ctl.sock` (`--follow`, `ack`, `decline`, `decide`, `--status-json`), and `install-hooks`. `coucou-daemon.service` is the systemd user unit.
-- `noctalia/` — Noctalia plugin `coucou/mochi` (Luau): `service.luau` (state machine), `desktop.luau` (animated Mochi), `bar.luau`, `panel.luau` (approvals and questions), `sounds/`, `translations/`, `tests/` (specs against a mocked host).
+- `mochi/` — Noctalia plugin `coucou/mochi` (Luau): `service.luau` (state machine), `desktop.luau` (animated Mochi), `bar.luau`, `panel.luau` (approvals and questions), `sounds/`, `translations/`, `tests/` (specs against a mocked host).
 - `catalog.toml` — Noctalia plugin source catalog. Noctalia looks for a plugin in the directory named after its id suffix (`mochi/` for `coucou/mochi`).
 - `linux/arch/PKGBUILD` — Arch package.
 - `odd/tasks/` — ODD task documents.
@@ -14,8 +14,8 @@ Linux-only fork of Coucou for Hyprland + Noctalia. Mochi lives on the Noctalia d
 ```
 (cd hook && cargo test && cargo build --release)
 (cd daemon && cargo test && cargo build --release)
-noctalia plugins lint noctalia
-LUAU=/path/to/luau noctalia/tests/run.sh
+noctalia plugins lint mochi
+LUAU=/path/to/luau mochi/tests/run.sh
 ```
 
 ## Rules

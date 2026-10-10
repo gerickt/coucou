@@ -15,7 +15,7 @@ agent hook ──> coucou-hook ──> $XDG_RUNTIME_DIR/coucou.sock ──> couc
 
 - `hook/` — `coucou-hook`, the relay each agent runs on every hook event. It forwards one JSON line to the daemon and exits at once if the daemon is not running, so an agent is never blocked.
 - `daemon/` — `coucou-daemon`, a small Rust daemon. It holds a permission request only if the plugin shows it within 800 ms, then waits up to 108 s for a click. No click means no answer, and the agent asks in its terminal as usual.
-- `noctalia/` — the Noctalia plugin `coucou/mochi`:
+- `mochi/` — the Noctalia plugin `coucou/mochi`:
   - **desktop widget**: the animated Mochi. Click him and he gets annoyed. Click three times fast and he gets dizzy. Hover him for 2 s and he falls in love. When a request is waiting, a click opens the approval panel.
   - **bar widget**: a mini Mochi and the running tool. Left click opens the panel, right click pauses or resumes Mochi.
   - **panel**: Allow / Deny for permission requests, and the options of Claude Code's questions.
@@ -101,8 +101,8 @@ Approvals and questions work for Claude Code and Codex. Gemini CLI and Antigravi
 
 ```
 (cd hook && cargo test) && (cd daemon && cargo test)
-noctalia plugins lint noctalia
-LUAU=/path/to/luau noctalia/tests/run.sh   # plugin specs against a mocked Noctalia host
+noctalia plugins lint mochi
+LUAU=/path/to/luau mochi/tests/run.sh   # plugin specs against a mocked Noctalia host
 ```
 
 ## License

@@ -2,7 +2,7 @@
 # Runs the plugin specs under the Luau CLI with a mocked Noctalia host.
 # Each spec is concatenated with the mocks and its entry script, since the
 # host gives every entry a single global environment.
-# Usage: noctalia/tests/run.sh   (needs `luau` in PATH, or LUAU=/path/to/luau)
+# Usage: mochi/tests/run.sh   (needs `luau` in PATH, or LUAU=/path/to/luau)
 set -eu
 LUAU=${LUAU:-luau}
 here=$(cd "$(dirname "$0")" && pwd)

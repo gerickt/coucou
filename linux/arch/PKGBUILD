@@ -51,7 +51,7 @@ package() {
   local src="$pkgdir/usr/share/coucou/noctalia"
   install -Dm644 catalog.toml "$src/catalog.toml"
   install -d "$src/mochi"
-  cp -r noctalia/plugin.toml noctalia/*.luau noctalia/translations noctalia/sounds "$src/mochi/"
+  cp -r mochi/plugin.toml mochi/*.luau mochi/translations mochi/sounds "$src/mochi/"
 
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 LICENSE-ASSETS.md "$pkgdir/usr/share/licenses/$pkgname/LICENSE-ASSETS.md"
