@@ -26,3 +26,23 @@ local function decode(s)
   return value()
 end
 noctalia.json.decode = decode
+-- Minimal JSON encoder (the UI mocks keep their own).
+local function encode(v)
+  local t = type(v)
+  if t == "string" then
+    return '"' .. v:gsub('[\\"]', "\\%0"):gsub("\n", "\\n") .. '"'
+  elseif t == "table" then
+    local out = {}
+    if #v > 0 then
+      for _, x in v do table.insert(out, encode(x)) end
+      return "[" .. table.concat(out, ",") .. "]"
+    end
+    local keys = {}
+    for k in v do table.insert(keys, k) end
+    table.sort(keys)
+    for _, k in keys do table.insert(out, encode(k) .. ":" .. encode(v[k])) end
+    return "{" .. table.concat(out, ",") .. "}"
+  end
+  return tostring(v)
+end
+noctalia.json.encode = encode

@@ -15,11 +15,19 @@
 -- for a human once acknowledged, within 800 ms) and the approval panel opens.
 -- Nothing is ever approved here: decisions come only from a click in the panel.
 --
--- IPC: noctalia msg plugin coucou/mochi:daemon all toggle-pause|pause|resume|open|agents
+-- The chat (chat.luau is its view): one turn at a time through
+-- `coucou-daemon chat --request <file>`, whose JSON lines stream the answer.
+-- The daemon looks the API key up itself; it never reaches this script. Mochi
+-- thinks while a turn runs, as the original island did.
+--
+-- IPC: noctalia msg plugin coucou/mochi:daemon all toggle-pause|pause|resume|open|agents|chat
 
 local KEY = "mochi"
+local CHAT_KEY = "mochi.chat"
+local CHAT_CMD = "mochi.chat.cmd"
 local PANEL = "coucou/mochi:approval"
 local AGENTS_PANEL = "coucou/mochi:agents"
+local CHAT_PANEL = "coucou/mochi:chat"
 local DAEMON = "coucou-daemon"
 
 -- Agents whose permission requests can be answered (coucou-hook reply.rs).
@@ -35,12 +43,16 @@ local SEARCH_TOOLS = {
 -- "approval" or "question" as the island opens ("open"); a decision "approve"
 -- (allow, answer) or "blip" (deny, back to the terminal), then "close"; coming
 -- back from pause "peek". Thinking, searching and sleeping play nothing there.
-local SOUNDS = { "work", "rate", "finish", "error", "approval", "question", "open", "approve", "blip", "close", "peek" }
+-- The chat plays "send", then "finish" or "error" (chat.ts); a file Mochi
+-- swallows plays "approve" (island.ts swallow).
+local SOUNDS = { "work", "rate", "finish", "error", "approval", "question", "open", "approve", "blip", "close", "peek", "send" }
 
 local FINISHED_HOLD_MS = 5200
 local SESSION_FORGET_MS = 60 * 60 * 1000
 local STREAM_STALE_MS = 45 * 1000
 local MAX_SESSIONS = 8
+-- The daemon gives up after 300 s; past this a silent turn is over.
+local CHAT_STALE_MS = 320 * 1000
 
 local function now() return noctalia.nowMs() end
 
@@ -56,25 +68,16 @@ local view = {
   rev = 0,
   stateSince = now(),
   music = false,
+  reaction = nil, -- { name, rev }: a one-shot for the desktop Mochi (the gulp)
 }
 local sessions = {} -- session id -> { id, agent, project, state, tool, updated, finishedAt }
 local focus = nil -- the session Mochi is showing
 
 -- ── Sounds ───────────────────────────────────────────────────────────────────
 
-local loaded = {}
-for _, name in SOUNDS do
-  noctalia.sound.load(name, "sounds/" .. name .. ".wav", function(ok, err)
-    loaded[name] = ok
-    if not ok then noctalia.log("mochi: sound " .. name .. " failed: " .. tostring(err)) end
-  end)
-end
-
-local function play(name)
-  if name and loaded[name] and noctalia.getConfig("sound_enabled") ~= false then
-    noctalia.sound.play(name)
-  end
-end
+local okBank, soundbank = pcall(require, "./soundbank.luau")
+if not okBank then soundbank = require("./soundbank") end
+local play = soundbank.new(noctalia, SOUNDS, function() return noctalia.getConfig("sound_enabled") ~= false end)
 
 -- ── Publishing ───────────────────────────────────────────────────────────────
 
@@ -100,12 +103,25 @@ local function publish()
     daemon = view.daemon,
     music = view.music,
     pending = view.pending,
+    reaction = view.reaction,
     sessions = view.sessions,
     rev = view.rev,
   })
 end
 
--- Mochi shows the pending card first, else the session that spoke last.
+local chat = {
+  messages = {}, -- { role, content, failed? }
+  live = "", -- the answer so far
+  busy = false,
+  error = "",
+  file = nil, -- { name, path }: rides with the first question
+  pid = nil,
+  rev = 0,
+  lastLine = 0,
+}
+
+-- Mochi shows the pending card first, then a chat turn running, else the
+-- session that spoke last.
 local function recompute()
   local before = view.state
   if view.pending then
@@ -113,6 +129,9 @@ local function recompute()
     view.tool = view.pending.tool or ""
     view.agent = view.pending.agent or ""
     view.project = view.pending.project or ""
+  elseif chat.busy then
+    view.state = "thinking"
+    view.tool = ""
   elseif focus and sessions[focus] then
     local s = sessions[focus]
     view.state = s.state
@@ -363,6 +382,170 @@ local function startStream()
   if not ok then noctalia.log("mochi: could not start " .. DAEMON .. " --follow") end
 end
 
+-- ── Chat ─────────────────────────────────────────────────────────────────────
+
+local chatGeneration = 0
+local lastChatSeq = nil
+
+local function publishChat()
+  chat.rev += 1
+  noctalia.state.set(CHAT_KEY, {
+    messages = chat.messages,
+    live = chat.live,
+    busy = chat.busy,
+    error = chat.error,
+    file = chat.file,
+    rev = chat.rev,
+  })
+end
+
+local function shellQuote(s)
+  return "'" .. s:gsub("'", "'\\''") .. "'"
+end
+
+local function runtimeDir()
+  local dir = noctalia.getenv("XDG_RUNTIME_DIR")
+  if type(dir) == "string" and dir:sub(1, 1) == "/" and not dir:find("'", 1, true) then return dir end
+  return nil
+end
+
+local function endTurn()
+  chat.busy = false
+  chat.pid = nil
+  chat.live = ""
+  chatGeneration += 1 -- later lines of that turn are ignored
+end
+
+local function onChatLine(line)
+  local ok, msg = pcall(noctalia.json.decode, line)
+  if not ok or type(msg) ~= "table" then return end
+  chat.lastLine = now()
+  if msg.type == "start" then
+    if type(msg.pid) == "number" then chat.pid = msg.pid end
+    return
+  elseif msg.type == "delta" and type(msg.text) == "string" then
+    chat.live = msg.text
+  elseif msg.type == "done" and type(msg.text) == "string" then
+    table.insert(chat.messages, { role = "assistant", content = msg.text })
+    endTurn()
+    play("finish")
+    recompute()
+  elseif msg.type == "error" then
+    -- A failed question stays on screen but is not sent again as history.
+    local last = chat.messages[#chat.messages]
+    if last and last.role == "user" then last.failed = true end
+    chat.error = if type(msg.message) == "string" then msg.message else "Error"
+    endTurn()
+    play("error")
+    recompute()
+  else
+    return
+  end
+  publishChat()
+end
+
+local function chatSend(c)
+  local question = if type(c.question) == "string" then c.question:match("^%s*(.-)%s*$") else ""
+  if chat.busy or question == "" then return end
+  local dir = runtimeDir()
+  if not dir then
+    chat.error = "XDG_RUNTIME_DIR is not set."
+    publishChat()
+    return
+  end
+  local history = {}
+  for _, m in chat.messages do
+    if not m.failed then table.insert(history, { role = m.role, content = m.content }) end
+  end
+  local turn = {
+    provider = tostring(c.provider or ""),
+    model = tostring(c.model or ""),
+    base_url = if type(c.base_url) == "string" then c.base_url else "",
+    history = history,
+    question = question,
+  }
+  -- The dropped file rides with the first question only (chat.ts).
+  if chat.file and #history == 0 then turn.file = chat.file end
+  local body = noctalia.json.encode(turn)
+  local path = dir .. "/coucou-chat-" .. math.floor(now()) .. "-" .. math.random(1, 1e9) .. ".json"
+  local written = body and noctalia.writeFile(path, body)
+  if not written then
+    chat.error = "Could not hand the question to coucou-daemon."
+    publishChat()
+    return
+  end
+  table.insert(chat.messages, { role = "user", content = question })
+  chat.error = ""
+  chat.live = ""
+  chat.busy = true
+  chat.pid = nil
+  chat.lastLine = now()
+  chatGeneration += 1
+  local mine = chatGeneration
+  play("send")
+  recompute()
+  publishChat()
+  local started = noctalia.runStream(DAEMON .. " chat --request " .. shellQuote(path), function(line)
+    if mine == chatGeneration then onChatLine(line) end
+  end)
+  if not started then
+    chat.messages[#chat.messages].failed = true
+    chat.error = "coucou-daemon could not be started."
+    endTurn()
+    recompute()
+    publishChat()
+  end
+end
+
+-- Stop: the daemon's process goes, and curl with it. What came so far stays.
+local function chatStop()
+  if not chat.busy then return end
+  if chat.pid then noctalia.runAsync({ "kill", "-TERM", tostring(math.floor(chat.pid)) }, function() end, 2000) end
+  local partial = chat.live
+  endTurn()
+  if partial ~= "" then table.insert(chat.messages, { role = "assistant", content = partial }) end
+  recompute()
+  publishChat()
+end
+
+local function chatReset()
+  chatStop()
+  chat.messages = {}
+  chat.error = ""
+  chat.file = nil
+  publishChat()
+end
+
+-- A file for the chat: a new conversation about it, and Mochi swallows it.
+local function chatAttach(c)
+  if type(c.path) ~= "string" or c.path:sub(1, 1) ~= "/" or type(c.name) ~= "string" then return end
+  chatReset()
+  chat.file = { name = c.name, path = c.path }
+  view.reaction = { name = "gulp", rev = ((view.reaction and view.reaction.rev) or 0) + 1 }
+  play("approve")
+  publishChat()
+  publish()
+end
+
+function onChatCommand(c)
+  if type(c) ~= "table" or c.seq == nil or c.seq == lastChatSeq then return end
+  lastChatSeq = c.seq
+  if c.op == "send" then
+    chatSend(c)
+  elseif c.op == "stop" then
+    chatStop()
+  elseif c.op == "reset" then
+    chatReset()
+  elseif c.op == "attach" then
+    chatAttach(c)
+  elseif c.op == "detach" then
+    chat.file = nil
+    publishChat()
+  end
+end
+
+noctalia.state.watch(CHAT_CMD, onChatCommand)
+
 -- ── IPC ──────────────────────────────────────────────────────────────────────
 
 local function setPaused(paused)
@@ -387,6 +570,8 @@ function onIpc(event, _payload)
     openPanel(view.pending and view.pending.id or nil)
   elseif event == "agents" then
     openPanel(nil, AGENTS_PANEL)
+  elseif event == "chat" then
+    openPanel(nil, CHAT_PANEL)
   end
 end
 
@@ -430,6 +615,9 @@ function update()
     end
   end
   if changed then recompute() end
+  if chat.busy and t - chat.lastLine > CHAT_STALE_MS then
+    onChatLine('{"type":"error","message":"No answer from coucou-daemon."}')
+  end
   if t - lastLine > STREAM_STALE_MS then
     noctalia.log("mochi: daemon stream silent, restarting it")
     startStream()
@@ -438,5 +626,6 @@ end
 
 noctalia.setUpdateInterval(1000)
 publish()
+publishChat()
 startStream()
 startMusic()

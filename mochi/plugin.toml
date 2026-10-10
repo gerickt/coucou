@@ -12,6 +12,11 @@
 # panel   -> approval card (Allow / Deny) and AskUserQuestion answers
 # agents  -> Settings > Agents: detected / connected agents, diff preview, then
 #            Connect / Disconnect on an explicit click (coucou-daemon install-hooks)
+# chat    -> the chat (Anthropic, Google, OpenAI, OpenRouter, Ollama, LM Studio,
+#            custom server), streamed by `coucou-daemon chat`; API keys in the
+#            Secret Service, only their presence is shown
+# shortcut-> quick-settings tile that opens the chat. A key for it in Hyprland:
+#            bind = CTRL ALT, Space, exec, noctalia msg panel-toggle coucou/mochi:chat
 #
 # Needs coucou-daemon running and its hooks installed (the Agents panel, or
 # `coucou-daemon install-hooks`).
@@ -105,3 +110,14 @@ id = "agents"
 entry = "agents.luau"
 width = 520
 height = 560
+
+[[panel]]
+id = "chat"
+entry = "chat.luau"
+width = 460
+height = 640
+keyboard_focus = "on_demand"
+
+[[shortcut]]
+id = "chat-tile"
+entry = "shortcut.luau"

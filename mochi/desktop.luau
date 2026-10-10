@@ -57,15 +57,10 @@ local GREETING_SECS = 3.5
 
 -- ── Sounds of the interactions ───────────────────────────────────────────────
 
-local loaded = {}
-for _, name in { "slap", "annoyed", "love", "dizzy", "hover", "pop", "greeting" } do
-  noctalia.sound.load(name, "sounds/" .. name .. ".wav", function(ok) loaded[name] = ok end)
-end
-
-local function play(name)
-  -- The global sound switch is a plugin-level setting, readable from here too.
-  if loaded[name] and noctalia.getConfig("sound_enabled") ~= false then noctalia.sound.play(name) end
-end
+-- The global sound switch is a plugin-level setting, readable from here too.
+local okBank, soundbank = pcall(require, "./soundbank.luau")
+if not okBank then soundbank = require("./soundbank") end
+local play = soundbank.new(noctalia, { "slap", "annoyed", "love", "dizzy", "hover", "pop", "greeting" }, function() return noctalia.getConfig("sound_enabled") ~= false end)
 
 -- ── Model ────────────────────────────────────────────────────────────────────
 
@@ -288,6 +283,10 @@ function onAgentsClick()
   msg("panel-open", "coucou/mochi:agents")
 end
 
+function onChatClick()
+  msg("panel-toggle", "coucou/mochi:chat")
+end
+
 function onMoveClick()
   msg("desktop-widgets-edit")
 end
@@ -313,9 +312,12 @@ local function render()
       ui.button({ glyph = "plug-connected", variant = "ghost", controlSize = "sm", visible = tools,
         enabled = tools, onClick = "onAgentsClick", onRightClick = "onAgentsClick", onHover = "onMochiHover",
         tooltip = noctalia.tr("desktop.agents") }),
+      ui.button({ glyph = "message-circle", variant = "ghost", controlSize = "sm", visible = tools,
+        enabled = tools, onClick = "onChatClick", onRightClick = "onChatClick", onHover = "onMochiHover",
+        tooltip = noctalia.tr("desktop.chat") }),
       ui.label({
         text = label, fontSize = math.max(10, S * 0.08), fontWeight = "semibold",
-        color = "on_surface", textAlign = "center", maxWidth = if tools then math.max(40, S - 112) else S, maxLines = 1,
+        color = "on_surface", textAlign = "center", maxWidth = if tools then math.max(40, S - 148) else S, maxLines = 1,
       }),
       ui.button({ glyph = "arrows-move", variant = "ghost", controlSize = "sm", visible = tools,
         enabled = tools, onClick = "onMoveClick", onRightClick = "onSettingsClick", onHover = "onMochiHover" }),
@@ -394,8 +396,23 @@ function update()
   wake()
 end
 
+-- A one-shot the service asks for (the gulp when a file goes to the chat);
+-- the one already there when the widget starts is not replayed.
+local reactionRev = nil
+
+local function readReaction()
+  local r = snap.reaction
+  local rev = if type(r) == "table" then r.rev else nil
+  if reactionRev ~= nil and rev ~= nil and rev ~= reactionRev and not dizzy and type(r.name) == "string" then
+    notePointer()
+    react(r.name)
+  end
+  reactionRev = rev or reactionRev or 0
+end
+
 local function readSnap(v)
   if type(v) == "table" then snap = v end
+  readReaction()
   dirty = true
   wake()
 end
@@ -403,6 +420,7 @@ end
 -- ── Start: hello! ────────────────────────────────────────────────────────────
 
 if type(noctalia.state.get("mochi")) == "table" then snap = noctalia.state.get("mochi") end
+readReaction()
 sync()
 if not snap.paused and player:once("greet") then play("greeting") end
 readFirstName()

@@ -5,6 +5,7 @@ calls = {}
 state = {}
 local watchers = {}
 played = {}
+pendingSounds = {}
 streams = {}
 commands = { playerctl = true }
 env = { USER = "tester" }
@@ -18,6 +19,8 @@ noctalia = {
   getConfig = function(k) return config[k] end,
   setUpdateInterval = function(ms) updateInterval = ms end,
   pluginDir = function() return "/plugin" end,
+  pluginDataDir = function() return "/data" end,
+  readFile = function(_p) return nil, "missing" end,
   runStream = function(cmd, cb)
     streams[cmd] = cb
     if cmd:find("--follow", 1, true) then streamCb = cb end
@@ -32,7 +35,15 @@ noctalia = {
     return true
   end,
   getenv = function(k) return env[k] end,
-  sound = { load = function(n, p, cb) cb(true) end, play = function(n) table.insert(played, n) end },
+  -- Like the host: at most eight loads pending; flushSounds() finishes them.
+  sound = {
+    load = function(n, p, cb)
+      if #pendingSounds >= 8 then return false end
+      table.insert(pendingSounds, cb)
+      return true
+    end,
+    play = function(n) table.insert(played, n) end,
+  },
   state = {
     set = function(k, v) state[k] = v; if watchers[k] then watchers[k](v) end end,
     get = function(k) return state[k] end,
@@ -41,5 +52,8 @@ noctalia = {
   json = {},
 }
 function advance(ms) clock += ms end
+function flushSounds()
+  while #pendingSounds > 0 do table.remove(pendingSounds, 1)(true) end
+end
 function feed(line) streamCb(line) end
 function lastCall() return calls[#calls] end

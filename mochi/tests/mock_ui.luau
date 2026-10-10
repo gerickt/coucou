@@ -1,11 +1,18 @@
 -- Mocked ui.* builders and tree checks for the specs.
 local function node(kind) return function(props, children) return { type = kind, props = props or {}, children = children or {} } end end
 ui = {}
-for _, k in { "column", "row", "scroll", "box", "label", "glyph", "image", "spacer", "button", "separator", "progress", "markdown", "toggle" } do ui[k] = node(k) end
+for _, k in { "column", "row", "scroll", "box", "label", "glyph", "image", "spacer", "button", "separator", "progress", "markdown", "toggle", "input", "select" } do ui[k] = node(k) end
 rendered = nil
 frameTick = false
 desktopWidget = { render = function(t) rendered = t end, setNeedsFrameTick = function(on) frameTick = on end }
 barWidget = { render = function(t) rendered = t end, setTooltip = function(t) tooltip = t end }
+tile = {}
+shortcut = {
+  setLabel = function(t) tile.label = t end,
+  setIcon = function(on) tile.icon = on end,
+  setActive = function(a) tile.active = a end,
+  setEnabled = function(e) tile.enabled = e end,
+}
 panelClosed = false
 panel = { render = function(t) rendered = t end, close = function() panelClosed = true end }
 noctalia.tr = function(k, a) return k end

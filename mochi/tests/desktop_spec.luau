@@ -1,4 +1,5 @@
 -- Desktop spec: plays the original Mochi's frame sequences and the interactions.
+flushSounds()
 
 local manifest = sprite.manifest.desktop.sequences
 local function filesOf(key)
@@ -197,4 +198,20 @@ print("ok  first name rules")
 onAgentsClick()
 assert(lastCall() == "noctalia msg panel-open coucou/mochi:agents", "agents button opens the Agents panel")
 print("ok  agents button")
+-- A file sent to the chat: he swallows it once (the reaction already there is not replayed).
+noctalia.state.set("mochi", { state = "idle", daemon = true, rev = 40, reaction = { name = "gulp", rev = 1 } })
+run(0.2)
+noctalia.state.set("mochi", { state = "idle", daemon = true, rev = 41, reaction = { name = "gulp", rev = 2 } })
+run(0.2)
+assert(shows(sprite.resolveOutfit(config.outfit) .. ".gulp"), "a new reaction plays the gulp")
+run(2.5)
+local gulpStart = {}
+for i = 1, 5 do gulpStart[manifest[sprite.resolveOutfit(config.outfit) .. ".gulp"].frames[i][1]] = true end
+noctalia.state.set("mochi", { state = "idle", daemon = true, rev = 42, reaction = { name = "gulp", rev = 2 } })
+run(0.1)
+assert(not gulpStart[image().props.path], "the same reaction is not replayed")
+print("ok  gulp on a file for the chat")
+onChatClick()
+assert(lastCall() == "noctalia msg panel-toggle coucou/mochi:chat", "chat button toggles the chat panel")
+print("ok  chat button")
 print("DESKTOP PASSED")

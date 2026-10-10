@@ -10,6 +10,7 @@
 
 local DAEMON = "coucou-daemon"
 local AGENTS_PANEL = "coucou/mochi:agents"
+local CHAT_PANEL = "coucou/mochi:chat"
 
 local AGENTS = {
   [""] = "Claude Code", ["claude-desktop"] = "Claude", gemini = "Gemini CLI", antigravity = "Antigravity",
@@ -63,6 +64,12 @@ function onDeny() decide("deny") end
 function onAgents()
   panel.close()
   noctalia.runAsync({ "noctalia", "msg", "panel-open", AGENTS_PANEL }, nil)
+end
+
+-- The chat lives in its own panel too.
+function onChat()
+  panel.close()
+  noctalia.runAsync({ "noctalia", "msg", "panel-open", CHAT_PANEL }, nil)
 end
 
 function onTerminal()
@@ -204,7 +211,10 @@ local function emptyView()
     header("Mochi", status),
     ui.label({ text = tr("panel.recent"), fontSize = 12, fontWeight = "semibold", color = "primary" }),
     ui.scroll({ flexGrow = 1, gap = 8 }, rows),
-    ui.button({ text = tr("panel.agents"), glyph = "plug-connected", variant = "outline", onClick = "onAgents" }),
+    ui.row({ gap = 8 }, {
+      ui.button({ text = tr("panel.chat"), glyph = "message-circle", variant = "outline", onClick = "onChat", flexGrow = 1 }),
+      ui.button({ text = tr("panel.agents"), glyph = "plug-connected", variant = "outline", onClick = "onAgents", flexGrow = 1 }),
+    }),
   })
 end
 

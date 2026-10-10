@@ -1,4 +1,5 @@
 -- Service spec: feeds daemon lines and checks the published snapshot.
+flushSounds()
 local function check(cond, msg) if not cond then error("FAIL: " .. msg, 2) end print("ok  " .. msg) end
 local m = function() return state.mochi end
 check(m().state == "idle" and m().daemon == false, "starts idle, daemon unknown")
@@ -71,4 +72,67 @@ feed('{"type":"hook","payload":{"hook_event_name":"SessionEnd","session_id":"s1"
 check(#m().sessions >= 0, "session end handled")
 onIpc("agents")
 check(lastCall() == "noctalia msg panel-open coucou/mochi:agents", "agents IPC opens the Agents panel")
+onIpc("chat")
+check(lastCall() == "noctalia msg panel-open coucou/mochi:chat", "chat IPC opens the chat panel")
+
+-- ── Chat ──
+config.sound_enabled = true
+env.XDG_RUNTIME_DIR = "/run/user/1000"
+local written = {}
+noctalia.writeFile = function(path, text) written[path] = text return true end
+local seq = 0
+local function cmd(t) seq += 1; t.seq = seq; noctalia.state.set("mochi.chat.cmd", t) end
+local function c() return state["mochi.chat"] end
+local function chatStream() for k, cb in streams do if k:find(" chat --request ", 1, true) then return k, cb end end end
+check(type(c()) == "table" and #c().messages == 0 and c().busy == false, "chat published empty")
+
+-- A file first: a fresh conversation, Mochi swallows it.
+local before = m().reaction
+cmd({ op = "attach", name = "notes.txt", path = "/home/tester/notes.txt" })
+check(c().file and c().file.name == "notes.txt", "file attached")
+check(m().reaction and m().reaction.name == "gulp" and m().reaction ~= before, "gulp reaction published")
+check(played[#played] == "approve", "swallow plays approve")
+
+cmd({ op = "send", question = "  what is this?  ", provider = "ollama", model = "llama3.2", base_url = "" })
+local key, cb = chatStream()
+check(key and key:match("^coucou%-daemon chat %-%-request '/run/user/1000/coucou%-chat%-[%d%-]+%.json'$"), "turn handed over by file: " .. tostring(key))
+local path = key:match("'(.-)'")
+local turn = noctalia.json.decode(written[path])
+check(turn.question == "what is this?" and turn.provider == "ollama" and turn.model == "llama3.2", "turn content")
+check(turn.file and turn.file.path == "/home/tester/notes.txt", "file rides with the first question")
+check(not written[path]:find("key", 1, true), "no key in the turn file")
+check(c().busy and m().state == "thinking", "Mochi thinks while the chat runs")
+check(played[#played] == "send", "send sound")
+cb('{"type":"start","pid":4242}')
+cb('{"type":"delta","text":"Hel"}')
+check(c().live == "Hel", "live text")
+cb('{"type":"done","text":"Hello!"}')
+check(not c().busy and #c().messages == 2 and c().messages[2].content == "Hello!", "answer recorded")
+check(played[#played] == "finish" and m().state ~= "thinking", "finish sound, Mochi back")
+cb('{"type":"delta","text":"late"}')
+check(c().live == "", "lines after the end are ignored")
+
+-- The next question: history, no file again.
+streams[key] = nil
+cmd({ op = "send", question = "more", provider = "ollama", model = "llama3.2" })
+local key2, cb2 = chatStream()
+local turn2 = noctalia.json.decode(written[key2:match("'(.-)'")])
+check(#turn2.history == 2 and turn2.file == nil, "history sent, file only once")
+cb2('{"type":"error","message":"Cannot reach it"}')
+check(c().error == "Cannot reach it" and c().messages[3].failed and played[#played] == "error", "error shown")
+
+-- A failed question is not history; Stop kills the turn and keeps what came.
+streams[key2] = nil
+cmd({ op = "send", question = "again", provider = "ollama", model = "m" })
+local key3, cb3 = chatStream()
+check(#noctalia.json.decode(written[key3:match("'(.-)'")]).history == 2, "failed question left out of history")
+cb3('{"type":"start","pid":777}')
+cb3('{"type":"delta","text":"Part"}')
+cmd({ op = "stop" })
+check(lastCall() == "kill -TERM 777", "stop kills the daemon turn")
+check(not c().busy and c().messages[#c().messages].content == "Part", "partial answer kept")
+cmd({ op = "reset" })
+check(#c().messages == 0 and c().file == nil, "new chat")
+cmd({ op = "send", question = "   " })
+check(not c().busy, "empty question ignored")
 print("ALL PASSED")
