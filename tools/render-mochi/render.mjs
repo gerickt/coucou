@@ -1,7 +1,7 @@
 // Renders Mochi's frame sequences with the ORIGINAL engine in headless Chrome.
 //
 //   node render.mjs <out-dir> [--only <name-substring>]
-//   node render.mjs --compare <work-dir> <frames-dir> <out.png>
+//   [COMPARE_ONLY=<regex on "mode:name">] node render.mjs --compare <work-dir> <frames-dir> <out.png>
 //
 // Serves the vendored TypeScript (types stripped by node:module, nothing else
 // changed) to a headless Chrome over a loopback HTTP server, drives BotEngine
@@ -167,7 +167,11 @@ async function compare(workDir, framesDir, outPng) {
   const port = server.address().port;
   const cdp = await launchChrome();
   try {
-    const picks = manifest.sequences.filter((q) => q.mode === "desktop" && (q.outfit === "none" || q.name.endsWith(".idle")));
+    // COMPARE_ONLY=<regex> narrows the sheet to some sequences (any mode).
+    const only = process.env.COMPARE_ONLY ? new RegExp(process.env.COMPARE_ONLY) : null;
+    const picks = manifest.sequences.filter((q) => only
+      ? only.test(`${q.mode}:${q.name}`)
+      : q.mode === "desktop" && (q.outfit === "none" || q.name.endsWith(".idle")));
     const W = 2 * 260 + 220;
     const rowH = 250;
     const page = await openPage(cdp, `http://127.0.0.1:${port}/page/index.html`, W, rowH * picks.length);

@@ -12,9 +12,20 @@
 //   greet() on launch, and the dizzy recovery (setState back + happy) of
 //   island.ts handleDizzy() after 3.3 s.
 //
-// Outfit matrix: "none" gets every sequence (all seven emotes and the gulp);
-// each wardrobe outfit gets the state loops, the enters and the reactions the
-// widgets play (slap, love, greet, dizzy). The bar gets the state loops.
+// - P4 additions, also BotEngine calls the original app made: proud on an
+//   outfit change (island.ts chooseOutfit), surprised when an alert goes up
+//   while he is on the desktop (desktop-logic.ts beginRetract, played over the
+//   alert state's own setState), the dance (setDancing(true) while music plays,
+//   desktop/main.ts and core/spotify.ts desktopDances), and the slap and love
+//   reactions drawn over the CURRENT state's body ("<state>.slap",
+//   "<state>.love") instead of the idle one.
+//
+// Outfit matrix: "none" gets every sequence (all seven emotes and the
+// reactions over every state); each wardrobe outfit gets the state loops,
+// the enters, the reactions the widgets play (slap, love, greet, dizzy), proud,
+// the alerts, the gulp and the dance. The bar gets the state loops and the dance. Kept
+// out for size (mochi/frames stays under ~25 MB): the per-state reactions of
+// the wardrobe outfits (the player falls back to the idle-body reaction).
 
 export const OUTFITS = [
   "none", "partyHat", "beanie", "crown", "sunglasses", "roundGlasses",
@@ -65,15 +76,25 @@ const REACTIONS = {
   greet: [2.2, "idle", [[0, "greet"]]],
 };
 
+// Every outfit: proud (outfit change) and the alerts (surprised + setState).
+const DRESSED = {
+  proud: [2.4, "idle", [[0, "triggerEmote", "proud"]]],
+  "approval.alert": [2.0, "idle", [[0, "setState", "approval"], [0, "triggerEmote", "surprised"]]],
+  "question.alert": [2.0, "idle", [[0, "setState", "question"], [0, "triggerEmote", "surprised"]]],
+  // The file drop (island.ts swallow): mouth slot open (morph 1), gulp, happy, back to Mochi.
+  gulp: [2.2, "idle", [[-0.7, "animateMorph", 1], [0, "gulp"], [0, "triggerEmote", "happy"], [0, "animateMorph", 0]]],
+};
+
+/** States whose body the "none" outfit's slap and love are drawn over. */
+const SLAP_OVER = ["working", "thinking", "searching", "error", "finished", "ratelimit"];
+const LOVE_OVER = ["working", "thinking", "searching", "approval", "question", "error", "finished", "ratelimit"];
+
 const EXTRAS = {
   happy: [2.0, "idle", [[0, "triggerEmote", "happy"]]],
   surprised: [2.0, "idle", [[0, "triggerEmote", "surprised"]]],
-  proud: [2.4, "idle", [[0, "triggerEmote", "proud"]]],
   wink: [2.4, "idle", [[0, "triggerEmote", "wink"]]],
   yawn: [2.6, "idle", [[0, "triggerEmote", "yawn"]]],
   annoyed: [1.2, "idle", [[0, "triggerEmote", "annoyed"]]],
-  // The file drop: mouth slot open (morph 1), gulp, happy, back to Mochi.
-  gulp: [2.2, "idle", [[-0.7, "animateMorph", 1], [0, "gulp"], [0, "triggerEmote", "happy"], [0, "animateMorph", 0]]],
 };
 
 /** Stable per-name seed, so every outfit gets the same motion. */
@@ -89,6 +110,24 @@ const MODES = {
   // 32 px bar icon at 2x, at two thirds of the desktop frame rate.
   bar: { scale: 2, fpsFactor: 2 / 3 },
 };
+
+// The dance: 112 BPM, its sway closes every two beats (danceTransform). The
+// level is full before the first frame (warm-up > 0.3 s fade-in). The loop is
+// one sway, so a blink inside it would repeat every 1.07 s: the next blink is
+// pushed past the clip (the engine still draws every pixel).
+const DANCE_LEN = (2 * 60) / 112;
+const DANCE_FPS = 20;
+
+function danceSeq(mode, outfit) {
+  const fps = DANCE_FPS * (MODES[mode].fpsFactor ?? 1);
+  const frames = Math.max(1, Math.round(DANCE_LEN * fps));
+  return {
+    name: `${outfit}.dance`, mode, scale: MODES[mode].scale, outfit, base: "idle",
+    kind: "loop", warm: 3, calmStart: true, frames, fps: frames / DANCE_LEN,
+    seed: seedOf(`${mode}.dance`),
+    events: [[-2.9, "setDancing", true], [-0.01, "set", "nextBlink", 1e9], [0, "set", "nextBlink", 1e9]],
+  };
+}
 
 function loopSeq(mode, outfit, state) {
   const [len, baseFps] = LOOPS[state];
@@ -115,6 +154,13 @@ for (const outfit of OUTFITS) {
   for (const s of STATES) SEQUENCES.push(loopSeq("desktop", outfit, s));
   for (const [n, d] of Object.entries(ENTERS)) SEQUENCES.push(oneShot("desktop", outfit, n, d));
   for (const [n, d] of Object.entries(REACTIONS)) SEQUENCES.push(oneShot("desktop", outfit, n, d));
-  if (outfit === "none") for (const [n, d] of Object.entries(EXTRAS)) SEQUENCES.push(oneShot("desktop", outfit, n, d));
+  for (const [n, d] of Object.entries(DRESSED)) SEQUENCES.push(oneShot("desktop", outfit, n, d));
+  SEQUENCES.push(danceSeq("desktop", outfit));
+  if (outfit === "none") {
+    for (const [n, d] of Object.entries(EXTRAS)) SEQUENCES.push(oneShot("desktop", outfit, n, d));
+    for (const st of SLAP_OVER) SEQUENCES.push(oneShot("desktop", outfit, `${st}.slap`, [REACTIONS.slap[0], st, REACTIONS.slap[2]]));
+    for (const st of LOVE_OVER) SEQUENCES.push(oneShot("desktop", outfit, `${st}.love`, [REACTIONS.love[0], st, REACTIONS.love[2]]));
+  }
   for (const s of STATES) SEQUENCES.push(loopSeq("bar", outfit, s));
+  SEQUENCES.push(danceSeq("bar", outfit));
 }
