@@ -7,6 +7,8 @@
 //! coucou-daemon ack <id>              the card is on screen
 //! coucou-daemon decline <id>          nobody can act on it, hand back to the terminal
 //! coucou-daemon decide <id> <allow|deny|answers-json>
+//! coucou-daemon install-hooks [--agent claude|gemini|antigravity|codex]...
+//!               [--remove] [--yes] [--home <dir>] [--hook-path <path>]
 //! ```
 //!
 //! `COUCOU_ACK_TIMEOUT_MS` and `COUCOU_DECISION_TIMEOUT_MS` override the
@@ -17,11 +19,13 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 mod hub;
+mod install;
 mod paths;
 mod protocol;
 mod server;
 
-const USAGE: &str = "usage: coucou-daemon [--follow | --status-json | ack <id> | decline <id> | decide <id> <allow|deny|answers-json>]";
+const USAGE: &str = "usage: coucou-daemon [--follow | --status-json | ack <id> | decline <id> | decide <id> <allow|deny|answers-json>]
+       coucou-daemon install-hooks [--agent claude|gemini|antigravity|codex]... [--remove] [--yes] [--home <dir>] [--hook-path <path>]";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -35,6 +39,7 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Some(verb @ ("ack" | "decline" | "decide")) => send(&control, &format!("{verb} {}", args[1..].join(" "))),
+        Some("install-hooks") => install_hooks(&args[1..]),
         Some("-h" | "--help") => {
             println!("{USAGE}");
             ExitCode::SUCCESS
@@ -42,6 +47,24 @@ fn main() -> ExitCode {
         Some(other) => {
             eprintln!("unknown argument: {other}\n{USAGE}");
             ExitCode::from(2)
+        }
+    }
+}
+
+fn install_hooks(args: &[String]) -> ExitCode {
+    let opts = match install::parse_args(args) {
+        Ok(opts) => opts,
+        Err(err) => {
+            eprintln!("coucou-daemon: {err}\n{USAGE}");
+            return ExitCode::from(2);
+        }
+    };
+    let stdin = std::io::stdin();
+    match install::run(&opts, &mut stdin.lock(), &mut std::io::stdout()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => {
+            eprintln!("coucou-daemon: {err}");
+            ExitCode::FAILURE
         }
     }
 }
