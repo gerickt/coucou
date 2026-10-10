@@ -69,7 +69,11 @@ const STALLED_AFTER: Duration = Duration::from_millis(1000);
 const FLIGHT: Duration = Duration::from_millis(420);
 const PEEK_BACK_AFTER: Duration = Duration::from_millis(1200);
 const PANEL: &str = "coucou/mochi:approval";
-const PLUGIN: &str = "coucou/mochi";
+const MENU: &str = "coucou/mochi:menu";
+/// How long the greeting stays under him after launch (desktop.luau GREETING_SECS).
+const GREETING: Duration = Duration::from_millis(3500);
+/// The text is this fraction of his square tall.
+const TEXT_PX: f32 = 0.085;
 
 /// Runs a command without waiting for it (reaped off the event loop).
 pub fn spawn(argv: &[&str]) {
@@ -100,8 +104,17 @@ struct Surf {
     spot: (f64, f64),
     docked: bool,
     layer_choice: LayerChoice,
-    drawn: Option<(String, u32)>,
+    drawn: Option<(String, u32, String)>,
     region_lift: Option<u32>,
+}
+
+/// The line under him: the greeting during its first seconds, then what the
+/// service says (the tool, a waiting request, paused…).
+fn line_under(p: &Published, greeting_window: bool) -> String {
+    if greeting_window && !p.greeting.is_empty() && !p.snap.paused {
+        return p.greeting.clone();
+    }
+    p.label.clone()
 }
 
 struct Press {
@@ -134,6 +147,9 @@ pub struct App {
     pub mochi: Mochi,
     pub published: Published,
     cache: Cache,
+    label: crate::text::Label,
+    started: Instant,
+    greeting_over: bool,
     sounds: Sounds,
     spots: Spots,
     spots_path: PathBuf,
@@ -200,6 +216,9 @@ impl App {
             mochi,
             published,
             cache: Cache::new(plugin_dir.clone(), side),
+            label: crate::text::Label::new(),
+            started: Instant::now(),
+            greeting_over: false,
             sounds: Sounds::new(&plugin_dir),
             spots: Spots::load(&spots_path),
             spots_path,
@@ -362,7 +381,8 @@ impl App {
         if !s.configured {
             return;
         }
-        if s.drawn.as_ref() == Some(&(file.clone(), lift)) {
+        let text = if lift == 0 { line_under(&self.published, self.started.elapsed() < GREETING) } else { String::new() };
+        if s.drawn.as_ref() == Some(&(file.clone(), lift, text.clone())) {
             self.needs_draw = false;
             return;
         }
@@ -393,6 +413,9 @@ impl App {
         };
         let Some(canvas) = s.buffers[i].canvas(&mut s.pool) else { return };
         image::blit(canvas, px, frame, lift * s.scale as u32);
+        if !text.is_empty() && self.label.available() {
+            self.label.draw_bottom(canvas, px, &text, TEXT_PX * px as f32);
+        }
         let surface = s.layer.wl_surface();
         surface.set_buffer_scale(s.scale);
         surface.damage_buffer(0, 0, px as i32, px as i32);
@@ -401,7 +424,7 @@ impl App {
             return;
         }
         s.layer.commit();
-        s.drawn = Some((file, lift));
+        s.drawn = Some((file, lift, text));
         self.frame_requested = Some(Instant::now());
         self.needs_draw = false;
     }
@@ -438,6 +461,9 @@ impl App {
         if let Some(t) = self.peek_back_at {
             at(t.saturating_duration_since(now));
         }
+        if !self.greeting_over {
+            at(GREETING.saturating_sub(self.started.elapsed()));
+        }
         // Hidden: nothing to animate until the compositor shows him again.
         if !self.stalled() {
             let d = self.mochi.due();
@@ -472,6 +498,10 @@ impl App {
                 self.flight = None;
                 self.save_spot();
             }
+        }
+        if !self.greeting_over && self.started.elapsed() >= GREETING {
+            self.greeting_over = true;
+            self.needs_draw = true;
         }
         if self.peek_back_at.is_some_and(|t| now >= t) {
             self.peek_back_at = None;
@@ -682,8 +712,8 @@ impl App {
                 if button == BTN_LEFT && geometry::is_over_body(local, side) {
                     self.press = Some(Press { local });
                 } else if button == BTN_RIGHT && geometry::is_over_body(local, side) {
-                    // Right click: the plugin's settings (outfit, sounds, overlay).
-                    spawn(&["noctalia", "msg", "settings-open-plugin", PLUGIN]);
+                    // Right click: the small menu (Wardrobe, Agents, Chat, Settings).
+                    spawn(&["noctalia", "msg", "panel-toggle", MENU]);
                 }
             }
             PointerEventKind::Release { button, .. } => {
@@ -952,3 +982,20 @@ impl ProvidesRegistryState for App {
 }
 
 smithay_client_toolkit::delegate_dispatch2!(App);
+
+#[cfg(test)]
+mod line_tests {
+    use super::*;
+
+    #[test]
+    fn greeting_first_then_the_label() {
+        let mut p = Published { greeting: "Coucou, Gerick!".into(), label: "Bash".into(), ..Default::default() };
+        assert_eq!(line_under(&p, true), "Coucou, Gerick!");
+        assert_eq!(line_under(&p, false), "Bash");
+        p.greeting.clear();
+        assert_eq!(line_under(&p, true), "Bash");
+        p.greeting = "Coucou, Gerick!".into();
+        p.snap.paused = true;
+        assert_eq!(line_under(&p, true), "Bash", "no greeting while paused");
+    }
+}

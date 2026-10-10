@@ -57,6 +57,11 @@ pub struct Published {
     pub daemon: bool,
     /// Service clock (ms) at the last write.
     pub ts: f64,
+    /// The line under him while the agent works or something waits ("Bash",
+    /// "Approval needed", "Paused"); empty when there is nothing to say.
+    pub label: String,
+    /// "Coucou, <name>!" once the service knows the first name (else empty).
+    pub greeting: String,
 }
 
 fn str_of<'a>(v: &'a Value, k: &str) -> Option<&'a str> {
@@ -65,6 +70,11 @@ fn str_of<'a>(v: &'a Value, k: &str) -> Option<&'a str> {
 
 fn bool_of(v: &Value, k: &str, default: bool) -> bool {
     v.get(k).and_then(Value::as_bool).unwrap_or(default)
+}
+
+/// One short line: control characters out, at most 80 characters.
+fn clean(raw: Option<&str>) -> String {
+    raw.unwrap_or_default().chars().filter(|c| !c.is_control()).take(80).collect::<String>().trim().to_string()
 }
 
 pub fn parse(text: &str) -> Option<Published> {
@@ -108,6 +118,8 @@ pub fn parse(text: &str) -> Option<Published> {
         settings,
         daemon: bool_of(&v, "daemon", false),
         ts: v.get("ts").and_then(Value::as_f64).unwrap_or(0.0),
+        label: clean(str_of(&v, "label")),
+        greeting: clean(str_of(&v, "greeting")),
     })
 }
 
@@ -131,12 +143,22 @@ mod tests {
         assert_eq!(p.snap.outfit, "crown");
         assert!(p.daemon);
         assert_eq!(p.ts, 1234.0);
+        assert_eq!((p.label.as_str(), p.greeting.as_str()), ("", ""));
         let s = p.settings;
         assert!(!s.sound);
         assert_eq!(s.surface, Surface::Both);
         assert_eq!(s.size, 256);
         assert_eq!(s.layer, LayerChoice::Overlay);
         assert!(s.peek && s.open_on_hover && !s.follow_cursor);
+    }
+
+    #[test]
+    fn label_and_greeting_are_one_clean_line() {
+        let p = parse(r#"{"label":"Ba\nsh\u0007 ","greeting":"Coucou, Théodore!"}"#).unwrap();
+        assert_eq!(p.label, "Bash");
+        assert_eq!(p.greeting, "Coucou, Théodore!");
+        let long = format!(r#"{{"label":"{}"}}"#, "x".repeat(200));
+        assert_eq!(parse(&long).unwrap().label.chars().count(), 80);
     }
 
     #[test]

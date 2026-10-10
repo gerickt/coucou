@@ -26,6 +26,7 @@ mod mochi;
 mod player;
 mod sound;
 mod state;
+mod text;
 
 use std::fs::File;
 use std::io::{Read, Write};

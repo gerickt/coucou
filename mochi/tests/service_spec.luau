@@ -250,4 +250,13 @@ check(ot.greeting == "desktop.greeting{name=Théodore}", "overlay greeting by fi
 feed('{"type":"hook","payload":{"hook_event_name":"PreToolUse","session_id":"test-a","tool_name":"Bash"}}')
 ot = noctalia.json.decode(written["/run/user/1000/coucou-mochi.json"])
 check(ot.label == "Bash", "overlay label is the running tool")
+feed('{"type":"hook","payload":{"hook_event_name":"Stop","session_id":"test-a"}}')
+check(noctalia.json.decode(written["/run/user/1000/coucou-mochi.json"]).label == "state.finished", "finished is labelled")
+feed('{"type":"hook","payload":{"hook_event_name":"UserPromptSubmit","session_id":"test-a"}}')
+check(noctalia.json.decode(written["/run/user/1000/coucou-mochi.json"]).label == "", "thinking says nothing")
+config.overlay_show_text = false
+advance(1000); update()
+ot = noctalia.json.decode(written["/run/user/1000/coucou-mochi.json"])
+check(ot.label == "" and ot.greeting == "", "text off: nothing under him")
+config.overlay_show_text = nil
 print("ALL PASSED")

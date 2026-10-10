@@ -718,10 +718,16 @@ end
 local TOOL_STATES = { working = true, searching = true, approval = true, question = true }
 local firstName = nil
 
+-- The tool while the agent is busy with it; else what is wrong or waiting
+-- ("Paused", "Daemon offline", "Approval needed"…). Idle and sleeping say nothing.
+local QUIET = { idle = true, sleeping = true, thinking = true }
 local function overlayLabel()
   if noctalia.getConfig("overlay_show_text") == false then return "" end
-  if TOOL_STATES[view.state] and type(view.tool) == "string" then return view.tool end
-  return ""
+  if view.paused then return noctalia.tr("state.paused") end
+  if not view.daemon then return noctalia.tr("state.offline") end
+  if TOOL_STATES[view.state] and type(view.tool) == "string" and view.tool ~= "" then return view.tool end
+  if QUIET[view.state] then return "" end
+  return noctalia.tr("state." .. view.state)
 end
 
 local function overlayGreeting()
