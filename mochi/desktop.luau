@@ -358,8 +358,19 @@ local function schedule()
 end
 
 -- The overlay alone shows him: nothing here, a settings check once a second.
+-- Read at most once a second (step runs per frame), and only when the
+-- coucou-mochi binary is installed: without it the widget stays.
+local overlayOnlyAt = -math.huge
+local overlayOnlyNow = false
+
 local function overlayOnly()
-  return noctalia.getConfig("mochi_surface") == "overlay"
+  local now = noctalia.nowMs()
+  if now - overlayOnlyAt >= 1000 then
+    overlayOnlyAt = now
+    local installed = not noctalia.commandExists or noctalia.commandExists("coucou-mochi")
+    overlayOnlyNow = installed and noctalia.getConfig("mochi_surface") == "overlay"
+  end
+  return overlayOnlyNow
 end
 
 local function stepAside()
