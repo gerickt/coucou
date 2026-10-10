@@ -1,5 +1,14 @@
 # Changelog
 
+## Linux 0.4.0 — October 10, 2026
+
+Linux fork for Hyprland + Noctalia.
+
+- **Noctalia widget**: Mochi as a native bar widget with a service and settings
+- **coucou-daemon**: a small Rust daemon receiving agent hook events over a Unix socket
+- Removed the macOS, iPhone and Windows apps, the relay and their CI
+- Arch package now builds the daemon and installs the plugin
+
 ## Windows and Linux 0.3.0 — October 9, 2026
 
 The first Linux release since 0.1.1, so on Linux it also brings everything in Windows and Linux 0.2.0 below.

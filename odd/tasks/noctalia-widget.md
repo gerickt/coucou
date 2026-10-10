@@ -1,0 +1,22 @@
+# Tasks: Linux Hyprland + Noctalia Only Migration
+
+- [x] 1. Clean up .gitignore and build configuration
+  - [x] Add `daemon/target` and clean up obsolete entries in `.gitignore`
+- [x] 2. Build daemon and fix compiler warnings
+  - [x] Fix unused imports in `daemon/src/main.rs`
+  - [x] Verify `cargo build --release` compiles cleanly without warnings
+- [x] 3. Validate and verify consistency of noctalia/ plugin
+  - [x] Check `noctalia/bar.luau`, `noctalia/service.luau`, `noctalia/plugin.toml`, `noctalia/translations/en.json`
+- [x] 4. Remove Windows and macOS artifacts
+  - [x] Remove `windows/` directory (Tauri app)
+  - [x] Remove macOS test scripts in `scripts/` and macOS test files in `tests/`
+  - [x] Remove macOS/Windows CI workflows (`.github/workflows/build.yml`, `.github/workflows/release.yml`, `.github/workflows/windows.yml`, `.github/workflows/windows-ci.yml`, and obsolete parts of `linux.yml`)
+  - [x] Remove or prune obsolete docs (`docs/IPHONE.md`, `docs/VOICE.md`, `docs/iphone.html`, etc.)
+  - [x] Remove `relay/` if macOS/iPhone push relay specific
+- [x] 5. Update Arch Linux packaging (`linux/arch/PKGBUILD`)
+  - [x] Update `PKGBUILD` to build and package `daemon/` (`coucou-daemon`) and install `noctalia/` plugin instead of `windows/`
+- [x] 6. Rewrite documentation
+  - [x] Rewrite `README.md` for Linux Hyprland + Noctalia only
+  - [x] Rewrite `CLAUDE.md` for Linux Hyprland + Noctalia only
+  - [x] Add entry in `CHANGELOG.md`
+- [x] 7. Commit changes in small conventional commits (no AI attribution)
