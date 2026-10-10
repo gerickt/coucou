@@ -18,24 +18,48 @@ const MARKER: &str = "coucou-hook";
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Agent {
     Claude,
+    Codex,
+    Copilot,
+    Muse,
     Gemini,
     Antigravity,
-    Codex,
+    Cursor,
+    OpenCode,
+    Amp,
+    Hermes,
 }
 
 impl Agent {
-    pub const ALL: &'static [Agent] = &[Agent::Claude, Agent::Gemini, Agent::Antigravity, Agent::Codex];
+    pub const ALL: &'static [Agent] = &[
+        Agent::Claude,
+        Agent::Codex,
+        Agent::Copilot,
+        Agent::Muse,
+        Agent::Gemini,
+        Agent::Antigravity,
+        Agent::Cursor,
+        Agent::OpenCode,
+        Agent::Amp,
+        Agent::Hermes,
+    ];
 
     pub fn from_id(id: &str) -> Option<Agent> {
         Agent::ALL.iter().copied().find(|a| a.id() == id)
     }
 
+    /// The `--agent` name the relay gets (and the pill, `agent_<id>`).
     pub fn id(self) -> &'static str {
         match self {
             Agent::Claude => "claude",
+            Agent::Codex => "codex",
+            Agent::Copilot => "copilot",
+            Agent::Muse => "muse",
             Agent::Gemini => "gemini",
             Agent::Antigravity => "antigravity",
-            Agent::Codex => "codex",
+            Agent::Cursor => "cursor",
+            Agent::OpenCode => "opencode",
+            Agent::Amp => "amp",
+            Agent::Hermes => "hermes",
         }
     }
 
@@ -50,25 +74,58 @@ impl Agent {
     pub fn name(self) -> &'static str {
         match self {
             Agent::Claude => "Claude Code",
+            Agent::Codex => "Codex",
+            Agent::Copilot => "GitHub Copilot CLI",
+            Agent::Muse => "Muse Code",
             Agent::Gemini => "Gemini CLI",
             Agent::Antigravity => "Antigravity",
-            Agent::Codex => "Codex",
+            Agent::Cursor => "Cursor Agent",
+            Agent::OpenCode => "OpenCode",
+            Agent::Amp => "Amp",
+            Agent::Hermes => "Hermes Agent",
+        }
+    }
+
+    /// What to do once the file is written.
+    pub fn note(self) -> &'static str {
+        match self {
+            Agent::Claude => "Start a new Claude Code session to pick the hooks up.",
+            Agent::Codex => "Codex runs new hooks only once you trust them: start Codex and review them once with /hooks.",
+            Agent::Copilot => "Start a new Copilot CLI session to pick the hooks up.",
+            Agent::Muse => "Start a new Muse Code session to pick the hooks up.",
+            Agent::Gemini => "Start a new Gemini CLI session to pick the hooks up.",
+            Agent::Antigravity => "Start a new Antigravity conversation to pick the hooks up.",
+            Agent::Cursor => "Restart Cursor to pick the hooks up.",
+            Agent::OpenCode => "Restart OpenCode to load the plugin.",
+            Agent::Amp => "Restart Amp to load the plugin.",
+            Agent::Hermes => "Turn it on once with `hermes plugins enable coucou`, then start a new Hermes session.",
         }
     }
 
     /// Whether Mochi can allow or deny this agent's permission requests. Must
     /// match `takes_decisions` in the relay (hook/src/reply.rs).
     pub fn approvals(self) -> bool {
-        matches!(self, Agent::Claude | Agent::Codex)
+        matches!(self, Agent::Claude | Agent::Codex | Agent::Copilot | Agent::Muse)
+    }
+
+    /// An agent that loads a plugin file rather than running hook commands.
+    fn is_plugin(self) -> bool {
+        matches!(self, Agent::OpenCode | Agent::Amp | Agent::Hermes)
     }
 
     /// The agent's own binaries and folders: any of them means it is installed.
     fn traces(self) -> (&'static [&'static str], &'static [&'static str]) {
         match self {
             Agent::Claude => (&["claude"], &[".claude"]),
+            Agent::Codex => (&["codex"], &[".codex"]),
+            Agent::Copilot => (&["copilot"], &[".copilot"]),
+            Agent::Muse => (&["muse"], &[".config/muse"]),
             Agent::Gemini => (&["gemini"], &[".gemini"]),
             Agent::Antigravity => (&["antigravity"], &[".antigravity", ".gemini/antigravity"]),
-            Agent::Codex => (&["codex"], &[".codex"]),
+            Agent::Cursor => (&["cursor-agent", "cursor"], &[".cursor"]),
+            Agent::OpenCode => (&["opencode"], &[".config/opencode", ".opencode"]),
+            Agent::Amp => (&["amp"], &[".config/amp"]),
+            Agent::Hermes => (&["hermes"], &[".hermes"]),
         }
     }
 
@@ -77,13 +134,36 @@ impl Agent {
         self.files(home).remove(0)
     }
 
-    /// Every file Coucou writes for this agent.
+    /// Every file Coucou writes for this agent (paths as in the original app).
     pub fn files(self, home: &Path) -> Vec<PathBuf> {
+        let config = home.join(".config");
         match self {
             Agent::Claude => vec![home.join(".claude").join("settings.json")],
+            Agent::Codex => vec![home.join(".codex").join("hooks.json")],
+            Agent::Copilot => vec![home.join(".copilot").join("hooks").join("coucou.json")],
+            Agent::Muse => vec![config.join("muse").join("settings.json")],
             Agent::Gemini => vec![home.join(".gemini").join("settings.json")],
             Agent::Antigravity => vec![home.join(".gemini").join("config").join("hooks.json")],
-            Agent::Codex => vec![home.join(".codex").join("hooks.json")],
+            Agent::Cursor => vec![home.join(".cursor").join("hooks.json")],
+            Agent::OpenCode => vec![config.join("opencode").join("plugins").join("coucou.js")],
+            Agent::Amp => vec![config.join("amp").join("plugins").join("coucou.ts")],
+            Agent::Hermes => {
+                let dir = home.join(".hermes").join("plugins").join("coucou");
+                vec![dir.join("__init__.py"), dir.join("plugin.yaml")]
+            }
+        }
+    }
+
+    /// For a plugin agent, the contents of each of its files (same order as
+    /// `files`). A JSON string is also a valid JavaScript, TypeScript and
+    /// Python one.
+    fn plugin(self, relay: &str) -> Vec<String> {
+        let hook = serde_json::to_string(relay).unwrap_or_default();
+        match self {
+            Agent::OpenCode => vec![OPENCODE_PLUGIN.replace("{HOOK}", &hook)],
+            Agent::Amp => vec![AMP_PLUGIN.replace("{HOOK}", &hook)],
+            Agent::Hermes => vec![HERMES_PLUGIN.replace("{HOOK}", &hook), HERMES_PLUGIN_YAML.to_string()],
+            _ => Vec::new(),
         }
     }
 }
@@ -133,6 +213,56 @@ const CODEX_EVENTS: &[(&str, u64)] = &[
     ("SessionEnd", 3),
 ];
 const CODEX_WAITING: &str = "Waiting for your answer in Mochi (Coucou)";
+
+/// Cursor Agent: flat `{"command"}` entries under camelCase events; the relay
+/// reads the event from the payload and never answers for Cursor.
+const CURSOR_EVENTS: &[&str] = &[
+    "sessionStart",
+    "sessionEnd",
+    "beforeSubmitPrompt",
+    "preToolUse",
+    "postToolUse",
+    "postToolUseFailure",
+    "stop",
+];
+
+/// GitHub Copilot CLI: a file of Coucou's own, camelCase events, timeouts in
+/// seconds. The event goes on the command line (Copilot leaves it out of the
+/// payload); the relay always answers permissionRequest, "ask" by default.
+const COPILOT_EVENTS: &[(&str, u64)] = &[
+    ("sessionStart", 10),
+    ("userPromptSubmitted", 10),
+    ("preToolUse", 10),
+    ("permissionRequest", 120),
+    ("postToolUse", 10),
+    ("agentStop", 10),
+    ("sessionEnd", 3),
+    ("notification", 10),
+];
+
+/// Muse Code: Claude-style groups with a `*` matcher, timeouts in seconds here
+/// and in milliseconds in the file.
+const MUSE_EVENTS: &[(&str, u64)] = &[
+    ("SessionStart", 10),
+    ("UserPromptSubmit", 5),
+    ("PreToolUse", 5),
+    ("PermissionRequest", 120),
+    ("PostToolUse", 5),
+    ("Stop", 5),
+    ("SessionEnd", 3),
+];
+
+/// Every plugin file Coucou writes says so; only such a file is replaced or
+/// removed.
+const GENERATED: &str = "generated by Coucou";
+
+// The original app's plugins (windows/src-tauri/src/agents.rs), byte for byte;
+// `{HOOK}` becomes the relay path as a JSON string. Fire-and-forget, display
+// only: none of them ever answers a permission.
+const OPENCODE_PLUGIN: &str = include_str!("templates/opencode.js");
+const AMP_PLUGIN: &str = include_str!("templates/amp.ts");
+const HERMES_PLUGIN: &str = include_str!("templates/hermes.py");
+const HERMES_PLUGIN_YAML: &str = include_str!("templates/hermes.yaml");
 
 /// `s` as one single-quoted POSIX shell word.
 fn sh_quote(s: &str) -> String {
@@ -238,6 +368,45 @@ fn groups_uninstall(root: &Value, tag: &str) -> Result<Value, String> {
     Ok(Value::Object(root))
 }
 
+fn copilot_entry_is_ours(entry: &Value) -> bool {
+    ["bash", "powershell", "command"].iter().any(|k| is_our_command(entry.get(*k), "copilot"))
+}
+
+fn copilot_install(root: &Value, relay: &str) -> Result<Value, String> {
+    let mut root = root.as_object().cloned().unwrap_or_default();
+    let mut hooks = object_at(&root, "hooks")?;
+    for (event, timeout) in COPILOT_EVENTS {
+        let mut list = list_at(&hooks, event)?;
+        list.retain(|e| !copilot_entry_is_ours(e));
+        let bash = command(relay, &format!("--agent copilot {event}"));
+        list.push(json!({ "type": "command", "bash": bash, "timeoutSec": timeout }));
+        hooks.insert((*event).into(), Value::Array(list));
+    }
+    root.insert("hooks".into(), Value::Object(hooks));
+    root.insert("version".into(), json!(1));
+    Ok(Value::Object(root))
+}
+
+/// Coucou's entries out; `plans` removes a file left with nobody else's.
+fn copilot_uninstall(root: &Value) -> Result<Value, String> {
+    let mut root = root.as_object().cloned().unwrap_or_default();
+    if root.contains_key("hooks") {
+        let mut hooks = object_at(&root, "hooks")?;
+        for list in hooks.values_mut() {
+            if let Value::Array(entries) = list {
+                entries.retain(|e| !copilot_entry_is_ours(e));
+            }
+        }
+        hooks.retain(|_, v| !v.as_array().is_some_and(Vec::is_empty));
+        if hooks.is_empty() {
+            root.remove("hooks");
+        } else {
+            root.insert("hooks".into(), Value::Object(hooks));
+        }
+    }
+    Ok(Value::Object(root))
+}
+
 fn antigravity_is_ours(group: &Value) -> bool {
     let text = group.to_string();
     text.contains(MARKER) && text.contains("--agent antigravity")
@@ -271,7 +440,35 @@ pub fn transform(agent: Agent, root: &Value, relay: &str, remove: bool) -> Resul
             root.insert("coucou".into(), Value::Object(block));
             Ok(Value::Object(root))
         }
+        (Agent::OpenCode | Agent::Amp | Agent::Hermes, _) => Err(format!("{} takes a plugin, not hook entries", agent.name())),
+        (Agent::Copilot, true) => copilot_uninstall(root),
+        (Agent::Copilot, false) => copilot_install(root, relay),
         (_, true) => groups_uninstall(root, agent.tag()),
+        (Agent::Cursor, false) => {
+            let cmd = command(relay, "--agent cursor");
+            let events = CURSOR_EVENTS.iter().map(|e| (e.to_string(), json!({ "command": cmd }))).collect();
+            let mut v = groups_install(root, "cursor", events)?;
+            if let Value::Object(m) = &mut v {
+                m.entry("version").or_insert(json!(1));
+            }
+            Ok(v)
+        }
+        (Agent::Muse, false) => {
+            let fresh = root.as_object().is_none_or(Map::is_empty);
+            let events = MUSE_EVENTS
+                .iter()
+                .map(|(event, seconds)| {
+                    let cmd = command(relay, &format!("--agent muse {event}"));
+                    let hook = json!({ "type": "command", "command": cmd, "timeout": seconds * 1000 });
+                    (event.to_string(), json!({ "matcher": "*", "hooks": [hook] }))
+                })
+                .collect();
+            let mut v = groups_install(root, "muse", events)?;
+            if let (true, Value::Object(m)) = (fresh, &mut v) {
+                m.insert("schema_version".into(), json!(1));
+            }
+            Ok(v)
+        }
         (Agent::Claude, false) => {
             let events = CLAUDE_EVENTS
                 .iter()
@@ -438,6 +635,21 @@ fn read_json(path: &Path, before: Option<&str>) -> Result<Value, String> {
 
 /// Reads the agent's files strictly and computes their new content.
 pub fn plans(agent: Agent, home: &Path, relay: &str, remove: bool) -> Result<Vec<Plan>, String> {
+    if agent.is_plugin() {
+        // Whole files, never merged: only a file Coucou wrote is replaced or removed.
+        return agent
+            .files(home)
+            .into_iter()
+            .zip(agent.plugin(relay))
+            .map(|(path, content)| {
+                let before = read_optional(&path)?;
+                if before.as_deref().is_some_and(|text| !text.contains(GENERATED)) {
+                    return Err(format!("{} wasn't written by Coucou; Coucou has not touched it", path.display()));
+                }
+                Ok(Plan { path, before, after: (!remove).then_some(content) })
+            })
+            .collect();
+    }
     let path = agent.file(home);
     let before = read_optional(&path)?;
     let current = read_json(&path, before.as_deref())?;
@@ -445,6 +657,10 @@ pub fn plans(agent: Agent, home: &Path, relay: &str, remove: bool) -> Result<Vec
     // Nothing to remove from a file that does not exist: leave it absent.
     if before.is_none() && remove {
         return Ok(vec![Plan { path, before: None, after: None }]);
+    }
+    // Copilot's file is Coucou's own: with nobody else's entries left, it goes.
+    if agent == Agent::Copilot && remove && next.as_object().is_some_and(|m| m.keys().all(|k| k == "version")) {
+        return Ok(vec![Plan { path, before, after: None }]);
     }
     // Same content, only formatted differently: no change.
     if before.as_deref().and_then(|b| serde_json::from_str::<Value>(b).ok()).as_ref() == Some(&next) {
@@ -572,6 +788,14 @@ pub fn relay_of_command(command: &str) -> Option<String> {
     (started && !word.is_empty()).then_some(word)
 }
 
+/// The relay a generated plugin starts: its `HOOK = "<json string>"` line.
+fn plugin_relay(text: &str) -> Option<String> {
+    text.lines().find_map(|line| {
+        let rest = line.strip_prefix("const HOOK = ").or_else(|| line.strip_prefix("HOOK = "))?;
+        serde_json::from_str::<String>(rest.trim().trim_end_matches(';')).ok()
+    })
+}
+
 /// Every command line Coucou wrote for `tag` in a JSON config.
 fn our_commands(root: &Value, tag: &str) -> Vec<String> {
     fn walk(v: &Value, tag: &str, out: &mut Vec<String>) {
@@ -613,6 +837,18 @@ pub fn status(agent: Agent, home: &Path, path_env: Option<&OsStr>) -> Status {
     let detected =
         bins.iter().any(|b| find_on_path(b, path_env).is_some()) || dirs.iter().any(|d| home.join(d).is_dir());
     let config_path = agent.file(home);
+    if agent.is_plugin() {
+        let relays: Vec<String> = read_optional(&config_path)
+            .ok()
+            .flatten()
+            .filter(|text| text.contains(GENERATED))
+            .and_then(|text| plugin_relay(&text))
+            .into_iter()
+            .collect();
+        let installed = !relays.is_empty();
+        let connected = installed && relays.iter().all(|r| relay_exists(r, path_env));
+        return Status { detected, installed, connected, config_path, relays };
+    }
     let root = read_optional(&config_path)
         .ok()
         .flatten()
@@ -642,6 +878,8 @@ pub fn status_json(agents: &[Agent], home: &Path, path_env: Option<&OsStr>, rela
                 "installed": s.installed,
                 "connected": s.connected,
                 "approvals": a.approvals(),
+                "plugin": a.is_plugin(),
+                "note": a.note(),
                 "config_path": s.config_path,
                 "files": a.files(home),
                 "relays": s.relays,
@@ -826,6 +1064,12 @@ pub fn run(opts: &Options, input: &mut impl BufRead, out: &mut impl Write) -> Re
             }
             .map_err(io_err)?;
         }
+        // Hermes loads every folder under plugins/: an empty `coucou` one goes too.
+        if *agent == Agent::Hermes && opts.remove {
+            if let Some(dir) = agent.file(&opts.home).parent() {
+                let _ = std::fs::remove_dir(dir);
+            }
+        }
     }
     Ok(())
 }
@@ -1000,6 +1244,123 @@ mod tests {
         std::fs::write(&file, "{ not json").unwrap();
         assert!(plans(Agent::Claude, &home, RELAY, false).is_err());
         std::fs::remove_dir_all(&home).unwrap();
+    }
+
+    #[test]
+    fn copilot_owns_its_file_and_removes_it_when_empty() {
+        let foreign = json!({ "version": 1, "hooks": { "preToolUse": [{ "type": "command", "bash": "my-check" }] } });
+        let v = transform(Agent::Copilot, &foreign, RELAY, false).unwrap();
+        let pre = v["hooks"]["preToolUse"].as_array().unwrap();
+        assert_eq!(pre.len(), 2);
+        assert_eq!(pre[1], json!({ "type": "command", "bash": "'/usr/bin/coucou-hook' --agent copilot preToolUse", "timeoutSec": 10 }));
+        assert_eq!(v["hooks"]["permissionRequest"][0]["timeoutSec"], 120);
+        assert_eq!(v["version"], 1);
+        assert_eq!(transform(Agent::Copilot, &v, RELAY, false).unwrap(), v);
+        assert_eq!(transform(Agent::Copilot, &v, RELAY, true).unwrap(), foreign);
+
+        let home = temp_home("copilot");
+        let p = plans(Agent::Copilot, &home, RELAY, false).unwrap().remove(0);
+        assert_eq!(p.path, home.join(".copilot/hooks/coucou.json"));
+        apply(&p, 0).unwrap();
+        assert!(status(Agent::Copilot, &home, None).installed);
+        // Only Coucou's entries in it: removing them removes the file.
+        let p = plans(Agent::Copilot, &home, RELAY, true).unwrap().remove(0);
+        assert!(p.after.is_none() && p.changes());
+        assert!(apply(&p, 0).unwrap().is_some(), "backed up first");
+        assert!(!p.path.exists());
+        std::fs::remove_dir_all(&home).unwrap();
+    }
+
+    #[test]
+    fn cursor_takes_flat_camel_case_entries_and_a_version() {
+        let existing = json!({ "hooks": { "stop": [{ "command": "notify-send done" }] } });
+        let v = transform(Agent::Cursor, &existing, RELAY, false).unwrap();
+        assert_eq!(v["version"], 1);
+        let stop = v["hooks"]["stop"].as_array().unwrap();
+        assert_eq!(stop[0]["command"], "notify-send done");
+        assert_eq!(stop[1], json!({ "command": "'/usr/bin/coucou-hook' --agent cursor" }));
+        assert_eq!(v["hooks"].as_object().unwrap().len(), CURSOR_EVENTS.len());
+        assert_eq!(transform(Agent::Cursor, &v, RELAY, false).unwrap(), v);
+        let removed = transform(Agent::Cursor, &v, RELAY, true).unwrap();
+        assert_eq!(removed["hooks"], existing["hooks"]);
+    }
+
+    #[test]
+    fn muse_uses_matchers_and_milliseconds() {
+        let v = transform(Agent::Muse, &json!({}), RELAY, false).unwrap();
+        assert_eq!(v["schema_version"], 1);
+        let hook = &v["hooks"]["PermissionRequest"][0];
+        assert_eq!(hook["matcher"], "*");
+        assert_eq!(hook["hooks"][0]["command"], "'/usr/bin/coucou-hook' --agent muse PermissionRequest");
+        assert_eq!(hook["hooks"][0]["timeout"], 120_000);
+        // An existing config gets no schema_version of ours.
+        let v = transform(Agent::Muse, &json!({ "theme": "x" }), RELAY, false).unwrap();
+        assert!(v.get("schema_version").is_none());
+        assert_eq!(transform(Agent::Muse, &v, RELAY, true).unwrap(), json!({ "theme": "x" }));
+    }
+
+    #[test]
+    fn plugins_are_the_original_templates_with_this_relay() {
+        let relay = "/home/me/bin/coucou-hook";
+        let home = temp_home("plugins");
+        for agent in [Agent::OpenCode, Agent::Amp, Agent::Hermes] {
+            let plans = plans(agent, &home, relay, false).unwrap();
+            assert_eq!(plans.len(), agent.files(&home).len());
+            for p in &plans {
+                apply(p, 0).unwrap();
+            }
+            let s = status(agent, &home, None);
+            assert!(s.installed, "{agent:?}");
+            assert_eq!(s.relays, vec![relay.to_string()]);
+        }
+        let js = std::fs::read_to_string(home.join(".config/opencode/plugins/coucou.js")).unwrap();
+        assert_eq!(js, OPENCODE_PLUGIN.replace("{HOOK}", "\"/home/me/bin/coucou-hook\""));
+        assert!(js.contains("const HOOK = \"/home/me/bin/coucou-hook\";"));
+        let ts = std::fs::read_to_string(home.join(".config/amp/plugins/coucou.ts")).unwrap();
+        assert_eq!(ts, AMP_PLUGIN.replace("{HOOK}", "\"/home/me/bin/coucou-hook\""));
+        let yaml = std::fs::read_to_string(home.join(".hermes/plugins/coucou/plugin.yaml")).unwrap();
+        assert_eq!(yaml, HERMES_PLUGIN_YAML);
+        // Installing again changes nothing.
+        assert!(!plans(Agent::Amp, &home, relay, false).unwrap().iter().any(Plan::changes));
+
+        // Removal takes the files away, and Hermes' folder with them.
+        let mut out = Vec::new();
+        let opts = Options {
+            agents: vec![Agent::Hermes, Agent::OpenCode],
+            yes: true,
+            remove: true,
+            home: home.clone(),
+            relay: relay.into(),
+            mode: Mode::Apply,
+            json: false,
+        };
+        run(&opts, &mut "".as_bytes(), &mut out).unwrap();
+        // The plugin files are gone; only their dated backups stay (the folder
+        // itself goes once it is empty).
+        let left: Vec<String> = std::fs::read_dir(home.join(".hermes/plugins/coucou"))
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(left.len(), 2);
+        assert!(left.iter().all(|n| n.contains(".coucou-backup-")), "{left:?}");
+        assert!(!home.join(".config/opencode/plugins/coucou.js").exists());
+        assert!(home.join(".config/amp/plugins/coucou.ts").exists());
+
+        // A file of the same name that Coucou did not write is never touched.
+        std::fs::write(home.join(".config/amp/plugins/coucou.ts"), "// mine\n").unwrap();
+        assert!(plans(Agent::Amp, &home, relay, false).is_err());
+        assert!(plans(Agent::Amp, &home, relay, true).is_err());
+        assert!(!status(Agent::Amp, &home, None).installed);
+        std::fs::remove_dir_all(&home).unwrap();
+    }
+
+    #[test]
+    fn every_agent_has_a_distinct_id_and_a_tag_on_its_entries() {
+        for (i, a) in Agent::ALL.iter().enumerate() {
+            assert_eq!(Agent::from_id(a.id()), Some(*a));
+            assert!(Agent::ALL[i + 1..].iter().all(|b| b.id() != a.id()));
+        }
+        assert_eq!(Agent::ALL.len(), 10);
     }
 
     fn args(list: &[&str]) -> Vec<String> {

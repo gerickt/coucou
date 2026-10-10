@@ -26,7 +26,7 @@ mod server;
 
 const USAGE: &str = "usage: coucou-daemon [--follow | --status-json | ack <id> | decline <id> | decide <id> <allow|deny|answers-json>]
        coucou-daemon install-hooks [--agent <id>]... [--remove] [--yes] [--status | --dry-run] [--json] [--home <dir>] [--hook-path <path>]
-       agents: claude, gemini, antigravity, codex";
+       agents: claude, codex, copilot, muse, gemini, antigravity, cursor, opencode, amp, hermes";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
