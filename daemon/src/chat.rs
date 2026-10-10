@@ -642,13 +642,17 @@ pub fn stream_turn(p: &Prepared, out: &mut dyn Write) {
     }
 }
 
-/// The turn file: a regular file directly in the runtime directory. Removed
-/// once read, whatever happens next.
-fn read_turn_file(path: &Path, runtime: &Path) -> Result<String, String> {
+/// A hand-off file from the plugin (a turn, a key being saved): a regular file
+/// directly in the runtime directory. Removed once read, whatever happens next.
+pub fn read_runtime_file(path: &Path, runtime: &Path, max: u64) -> Result<String, String> {
     let meta = std::fs::symlink_metadata(path).map_err(|e| format!("request: {e}"))?;
     let inside = path.parent().and_then(|p| p.canonicalize().ok()) == runtime.canonicalize().ok();
-    if !meta.is_file() || !inside || meta.len() > MAX_REQUEST_FILE {
-        return Err("request: not a turn file".into());
+    if !meta.is_file() || !inside || meta.len() > max {
+        // Only a hand-off file of ours (too large) is removed; never anything else.
+        if meta.is_file() && inside {
+            let _ = std::fs::remove_file(path);
+        }
+        return Err("request: not a hand-off file".into());
     }
     let text = std::fs::read_to_string(path).map_err(|e| format!("request: {e}"));
     let _ = std::fs::remove_file(path);
@@ -660,7 +664,7 @@ pub fn run(args: &[String], out: &mut dyn Write) -> bool {
     emit(out, json!({ "type": "start", "pid": std::process::id() }));
     let prepared = match args {
         [flag, path] if flag == "--request" => {
-            read_turn_file(Path::new(path), &crate::paths::runtime_dir()).and_then(|text| parse_turn(&text)).and_then(|turn| {
+            read_runtime_file(Path::new(path), &crate::paths::runtime_dir(), MAX_REQUEST_FILE).and_then(|text| parse_turn(&text)).and_then(|turn| {
                 let name = first_name();
                 let base = std::env::var("COUCOU_ANTHROPIC_BASE_URL").ok();
                 prepare(&turn, &Env { secret: &secrets::get, first_name: name.as_deref(), anthropic_base: base.as_deref() })

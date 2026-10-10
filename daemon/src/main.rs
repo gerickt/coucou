@@ -10,7 +10,7 @@
 //! coucou-daemon install-hooks [--agent <id>]... [--remove] [--yes]
 //!               [--status | --dry-run] [--json] [--home <dir>] [--hook-path <path>]
 //!               [--expect-sha256 <path>=<sha256>]...
-//! coucou-daemon secret has|set|delete <provider|key> [--bound-url <url>]   (set reads stdin)
+//! coucou-daemon secret has|set|delete <provider|key> [--bound-url <url>] [--from-file <path>]   (set reads stdin)
 //! coucou-daemon chat --request <file>  one chat turn, streamed as JSON lines (chat.rs)
 //! coucou-daemon chat-models <provider> [--base-url <url>]
 //! ```
@@ -33,7 +33,7 @@ mod server;
 
 const USAGE: &str = "usage: coucou-daemon [--follow | --status-json | ack <id> | decline <id> | decide <id> <allow|deny|answers-json>]
        coucou-daemon install-hooks [--agent <id>]... [--remove] [--yes] [--status | --dry-run] [--json] [--home <dir>] [--hook-path <path>] [--expect-sha256 <path>=<sha256>]...
-       coucou-daemon secret has|set|delete <provider|key> [--bound-url <url>]
+       coucou-daemon secret has|set|delete <provider|key> [--bound-url <url>] [--from-file <path>]
        coucou-daemon chat --request <file> | chat-models <provider> [--base-url <url>]
        agents: claude, codex, copilot, muse, gemini, antigravity, cursor, opencode, amp, hermes";
 

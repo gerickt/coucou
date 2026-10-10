@@ -143,8 +143,9 @@ pub fn delete(key: &str) -> Result<(), String> {
     }
 }
 
-/// `coucou-daemon secret has|set|delete <provider|key> [--bound-url <url>]`.
-/// `has` prints `{"key":…,"present":bool}`; `set` reads the key from stdin.
+/// `coucou-daemon secret has|set|delete <provider|key> [--bound-url <url>] [--from-file <path>]`.
+/// `has` prints `{"key":…,"present":bool}`; `set` reads the key from stdin,
+/// or from a hand-off file in the runtime directory.
 /// `--bound-url` (custom server only) stores the key with the one address it
 /// may be sent to, as the original's Local models section did.
 pub fn run(args: &[String], stdin: &mut dyn Read, out: &mut dyn Write) -> Result<(), String> {
@@ -153,19 +154,36 @@ pub fn run(args: &[String], stdin: &mut dyn Read, out: &mut dyn Write) -> Result
         _ => return Err("usage: coucou-daemon secret has|set|delete <provider|key>".into()),
     };
     let key = key_name(name).ok_or_else(|| format!("unknown key {name}"))?;
-    let bound = match &args[2..] {
-        [] => None,
-        [flag, url] if flag == "--bound-url" && verb == "set" && key == "openai-compatible-key" => Some(url.as_str()),
-        _ => return Err("unexpected arguments".into()),
-    };
+    let (mut bound, mut from_file) = (None, None);
+    let mut rest = args[2..].iter();
+    while let Some(flag) = rest.next() {
+        match (flag.as_str(), rest.next()) {
+            ("--bound-url", Some(url)) if verb == "set" && key == "openai-compatible-key" => bound = Some(url.as_str()),
+            ("--from-file", Some(path)) if verb == "set" => from_file = Some(path.as_str()),
+            _ => return Err("unexpected arguments".into()),
+        }
+    }
     match verb {
         "has" => {
             let line = serde_json::json!({ "key": key, "present": has(key) });
             writeln!(out, "{line}").map_err(|e| e.to_string())
         }
         "set" => {
-            let mut raw = String::new();
-            stdin.take(MAX_SECRET as u64 + 1).read_to_string(&mut raw).map_err(|e| e.to_string())?;
+            let raw = match from_file {
+                // The plugin cannot write to a child's stdin: it leaves the key
+                // in a file in the private runtime directory (tmpfs), removed
+                // here as soon as it is read.
+                Some(path) => crate::chat::read_runtime_file(
+                    std::path::Path::new(path),
+                    &crate::paths::runtime_dir(),
+                    MAX_SECRET as u64,
+                )?,
+                None => {
+                    let mut raw = String::new();
+                    stdin.take(MAX_SECRET as u64 + 1).read_to_string(&mut raw).map_err(|e| e.to_string())?;
+                    raw
+                }
+            };
             let value = clean_secret(&raw)?;
             let value = match bound {
                 Some(url) => crate::chat::bind_custom_key(url, &value)?,
@@ -238,6 +256,9 @@ mod tests {
         assert!(run(&["has".into(), "nope".into()], &mut std::io::empty(), &mut out).is_err());
         assert!(run(&["has".into(), "openai".into(), "--bound-url".into(), "x".into()], &mut std::io::empty(), &mut out).is_err());
         assert!(run(&["set".into(), "openai".into()], &mut "  ".as_bytes(), &mut out).is_err());
+        assert!(run(&["set".into(), "openai".into(), "--bound-url".into(), "https://x".into()], &mut "k".as_bytes(), &mut out).is_err());
+        // A hand-off file must sit directly in the runtime directory.
+        assert!(run(&["set".into(), "openai".into(), "--from-file".into(), "/etc/hostname".into()], &mut std::io::empty(), &mut out).is_err());
         assert!(out.is_empty());
     }
 }
