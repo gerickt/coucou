@@ -20,7 +20,18 @@
 -- The daemon looks the API key up itself; it never reaches this script. Mochi
 -- thinks while a turn runs, as the original island did.
 --
+-- The coucou-mochi overlay (P14): Noctalia's desktop widgets sit under the
+-- windows, so Mochi also floats above them on a layer-shell surface drawn by
+-- the coucou-mochi binary. With the `mochi_surface` setting at "overlay" (the
+-- default) or "both", this service starts it (`--managed`: it exits with the
+-- shell, or when this service stops writing) and checks every 30 s that it
+-- still runs; "desktop_widget" asks it to quit. Mochi's state and the
+-- overlay's settings go to $XDG_RUNTIME_DIR/coucou-mochi.json, written when
+-- they change and every 20 s as a heartbeat. The overlay plays its own
+-- interaction sounds (slap, love…); the agent sounds stay here.
+--
 -- IPC: noctalia msg plugin coucou/mochi:daemon all toggle-pause|pause|resume|open|agents|chat
+--      noctalia msg plugin coucou/mochi:daemon all attach <absolute path>  (a file for the chat)
 
 local KEY = "mochi"
 local CHAT_KEY = "mochi.chat"
@@ -77,6 +88,8 @@ local focus = nil -- the session Mochi is showing
 
 local okBank, soundbank = pcall(require, "./soundbank.luau")
 if not okBank then soundbank = require("./soundbank") end
+local okWardrobe, wardrobe = pcall(require, "./wardrobe.luau")
+if not okWardrobe then wardrobe = require("./wardrobe") end
 local play = soundbank.new(noctalia, SOUNDS, function() return noctalia.getConfig("sound_enabled") ~= false end)
 
 -- ── Publishing ───────────────────────────────────────────────────────────────
@@ -90,6 +103,8 @@ local function sessionList()
   while #list > MAX_SESSIONS do table.remove(list) end
   return list
 end
+
+local publishOverlay -- below: the overlay's copy of the snapshot
 
 local function publish()
   view.rev += 1
@@ -107,6 +122,7 @@ local function publish()
     sessions = view.sessions,
     rev = view.rev,
   })
+  publishOverlay()
 end
 
 local chat = {
@@ -546,6 +562,95 @@ end
 
 noctalia.state.watch(CHAT_CMD, onChatCommand)
 
+-- ── The coucou-mochi overlay ─────────────────────────────────────────────────
+
+local OVERLAY = "coucou-mochi"
+local OVERLAY_FILE = "coucou-mochi.json"
+local OVERLAY_HEARTBEAT_MS = 20 * 1000
+local OVERLAY_CHECK_MS = 30 * 1000
+
+local function surface()
+  local s = noctalia.getConfig("mochi_surface")
+  if s == "desktop_widget" or s == "both" then return s end
+  return "overlay"
+end
+
+local function overlaySettings()
+  local size = tonumber(noctalia.getConfig("overlay_size")) or 120
+  local layer = noctalia.getConfig("overlay_layer")
+  return {
+    sound_enabled = noctalia.getConfig("sound_enabled") ~= false,
+    mochi_surface = surface(),
+    overlay_size = math.clamp(math.floor(size), 64, 256),
+    overlay_layer = if layer == "overlay" then "overlay" else "top",
+    overlay_follow_cursor = noctalia.getConfig("overlay_follow_cursor") ~= false,
+    overlay_peek = noctalia.getConfig("overlay_peek") == true,
+    overlay_open_on_hover = noctalia.getConfig("overlay_open_on_hover") == true,
+  }
+end
+
+local overlayText = nil
+local overlayWrittenAt = -math.huge
+
+function publishOverlay()
+  local dir = runtimeDir()
+  if not dir or type(noctalia.writeFile) ~= "function" then return end
+  local choice = noctalia.getConfig("outfit")
+  local body = {
+    state = view.state,
+    paused = view.paused,
+    daemon = view.daemon,
+    music = view.music,
+    reaction = view.reaction,
+    outfit = wardrobe.resolveOutfit(choice),
+    outfit_choice = if type(choice) == "string" then choice else "auto",
+    settings = overlaySettings(),
+  }
+  local text = noctalia.json.encode(body)
+  local t = now()
+  if text == overlayText and t - overlayWrittenAt < OVERLAY_HEARTBEAT_MS then return end
+  overlayText = text
+  overlayWrittenAt = t
+  body.ts = t
+  local out = noctalia.json.encode(body)
+  if out then noctalia.writeFile(dir .. "/" .. OVERLAY_FILE, out) end
+end
+
+local overlayCheckAt = 0
+local overlayQuitSent = false
+
+local function startOverlay()
+  local dir = noctalia.pluginDir
+  if type(dir) == "function" then dir = dir() end
+  if type(dir) ~= "string" or dir == "" or dir:find("'", 1, true) then return end
+  -- exec: the overlay's parent is the shell itself, so --managed ends with it.
+  local ok = noctalia.runStream("exec " .. OVERLAY .. " --managed --plugin-dir " .. shellQuote(dir), function(line)
+    noctalia.log("mochi overlay: " .. tostring(line))
+  end)
+  if not ok then noctalia.log("mochi: could not start " .. OVERLAY) end
+end
+
+local function ensureOverlay()
+  if not (noctalia.commandExists and noctalia.commandExists(OVERLAY)) then return end
+  if surface() == "desktop_widget" then
+    -- It also quits by itself on reading the setting; this covers an old one.
+    if not overlayQuitSent then
+      overlayQuitSent = true
+      noctalia.runAsync({ OVERLAY, "--quit" }, function() end, 3000)
+    end
+    overlayCheckAt = 0
+    return
+  end
+  overlayQuitSent = false
+  local t = now()
+  if t < overlayCheckAt then return end
+  overlayCheckAt = t + OVERLAY_CHECK_MS
+  -- --status: 0 while an instance holds the session lock.
+  noctalia.runAsync({ OVERLAY, "--status" }, function(res)
+    if res.exitCode ~= 0 and surface() ~= "desktop_widget" then startOverlay() end
+  end, 3000)
+end
+
 -- ── IPC ──────────────────────────────────────────────────────────────────────
 
 local function setPaused(paused)
@@ -559,7 +664,7 @@ local function setPaused(paused)
   recompute()
 end
 
-function onIpc(event, _payload)
+function onIpc(event, payload)
   if event == "toggle-pause" then
     setPaused(not view.paused)
   elseif event == "pause" then
@@ -572,6 +677,12 @@ function onIpc(event, _payload)
     openPanel(nil, AGENTS_PANEL)
   elseif event == "chat" then
     openPanel(nil, CHAT_PANEL)
+  elseif event == "attach" then
+    -- A file dropped on the overlay: a chat about it, and Mochi swallows it.
+    if type(payload) == "string" and payload:sub(1, 1) == "/" and not payload:find("\n", 1, true) then
+      chatAttach({ path = payload, name = basename(payload) })
+      openPanel(nil, CHAT_PANEL)
+    end
   end
 end
 
@@ -615,6 +726,8 @@ function update()
     end
   end
   if changed then recompute() end
+  publishOverlay()
+  ensureOverlay()
   if chat.busy and t - chat.lastLine > CHAT_STALE_MS then
     onChatLine('{"type":"error","message":"No answer from coucou-daemon."}')
   end

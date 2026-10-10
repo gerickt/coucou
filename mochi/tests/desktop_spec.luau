@@ -214,4 +214,16 @@ print("ok  gulp on a file for the chat")
 onChatClick()
 assert(lastCall() == "noctalia msg panel-toggle coucou/mochi:chat", "chat button toggles the chat panel")
 print("ok  chat button")
+-- P14: with the overlay alone (mochi_surface = "overlay") the widget steps
+-- aside: nothing drawn, no frame ticks; "both" brings him back.
+config.mochi_surface = "overlay"
+run(0.2)
+assert(image() == nil, "overlay only: the widget draws no Mochi")
+assert(frameTick == false and updateInterval == 1000, "overlay only: no frame ticks, a slow settings check")
+config.mochi_surface = "both"
+update()
+run(0.2)
+assert(image() ~= nil, "both: the widget draws him again")
+config.mochi_surface = nil
+print("ok  steps aside for the overlay")
 print("DESKTOP PASSED")

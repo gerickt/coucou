@@ -4,8 +4,10 @@
 #
 # service -> follows `coucou-daemon --follow`, runs Mochi's state machine,
 #            plays sounds, publishes everything to noctalia.state ("mochi")
-#            IPC: noctalia msg plugin coucou/mochi:daemon all toggle-pause|pause|resume|open|agents
-# desktop -> the big animated Mochi (click, triple click, hover reactions)
+#            IPC: noctalia msg plugin coucou/mochi:daemon all toggle-pause|pause|resume|open|agents|chat|attach <path>
+#            starts the coucou-mochi overlay (mochi_surface = overlay | both)
+# desktop -> the big animated Mochi (click, triple click, hover reactions); steps
+#            aside when mochi_surface = overlay (it lives under the windows)
 # bar     -> mini Mochi + current tool; left click opens the panel, right click opens the settings
 # sprite  -> shared: plays frames/ (the original Mochi engine, pre-rendered by
 #            tools/render-mochi) and resolves the outfit setting
@@ -19,7 +21,8 @@
 #            bind = CTRL ALT, Space, exec, noctalia msg panel-toggle coucou/mochi:chat
 #
 # Needs coucou-daemon running and its hooks installed (the Agents panel, or
-# `coucou-daemon install-hooks`).
+# `coucou-daemon install-hooks`). The overlay needs coucou-mochi on PATH
+# (overlay/ in the repository; Wayland with wlr-layer-shell).
 
 id = "coucou/mochi"
 name = "Mochi"
@@ -60,6 +63,61 @@ options = [
   { value = "santaHat", label_key = "settings.outfit.options.santaHat" },
   { value = "bunnyEars", label_key = "settings.outfit.options.bunnyEars" },
 ]
+
+# Where Mochi lives (P14). Noctalia's desktop widgets sit under the windows;
+# the coucou-mochi overlay floats above them on the focused monitor.
+[[setting]]
+key = "mochi_surface"
+type = "select"
+label_key = "settings.mochi_surface.label"
+description_key = "settings.mochi_surface.description"
+default = "overlay"
+options = [
+  { value = "overlay", label_key = "settings.mochi_surface.options.overlay" },
+  { value = "desktop_widget", label_key = "settings.mochi_surface.options.desktop_widget" },
+  { value = "both", label_key = "settings.mochi_surface.options.both" },
+]
+
+[[setting]]
+key = "overlay_size"
+type = "int"
+label_key = "settings.overlay_size.label"
+description_key = "settings.overlay_size.description"
+default = 120
+min = 64
+max = 256
+
+[[setting]]
+key = "overlay_layer"
+type = "select"
+label_key = "settings.overlay_layer.label"
+description_key = "settings.overlay_layer.description"
+default = "top"
+options = [
+  { value = "top", label_key = "settings.overlay_layer.options.top" },
+  { value = "overlay", label_key = "settings.overlay_layer.options.overlay" },
+]
+
+[[setting]]
+key = "overlay_follow_cursor"
+type = "bool"
+label_key = "settings.overlay_follow_cursor.label"
+description_key = "settings.overlay_follow_cursor.description"
+default = true
+
+[[setting]]
+key = "overlay_peek"
+type = "bool"
+label_key = "settings.overlay_peek.label"
+description_key = "settings.overlay_peek.description"
+default = false
+
+[[setting]]
+key = "overlay_open_on_hover"
+type = "bool"
+label_key = "settings.overlay_open_on_hover.label"
+description_key = "settings.overlay_open_on_hover.description"
+default = false
 
 [[service]]
 id = "daemon"

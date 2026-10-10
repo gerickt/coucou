@@ -30,6 +30,39 @@
         "santaHat": "Santa hat",
         "bunnyEars": "Bunny ears"
       }
+    },
+    "mochi_surface": {
+      "label": "Where Mochi lives",
+      "description": "Overlay: Mochi floats above your windows on the focused monitor (coucou-mochi). Desktop widget: Noctalia's desktop layer, under the windows. Both: the two.",
+      "options": {
+        "overlay": "Above the windows (overlay)",
+        "desktop_widget": "Desktop widget",
+        "both": "Both"
+      }
+    },
+    "overlay_size": {
+      "label": "Overlay size",
+      "description": "Side of the floating Mochi, in pixels (the original is 120)."
+    },
+    "overlay_layer": {
+      "label": "Overlay layer",
+      "description": "Top: above windows, under fullscreen ones (like the original). Overlay: above fullscreen windows too.",
+      "options": {
+        "top": "Top (under fullscreen)",
+        "overlay": "Overlay (above fullscreen)"
+      }
+    },
+    "overlay_follow_cursor": {
+      "label": "Eyes follow the pointer",
+      "description": "Mochi looks at the pointer while he is awake (Hyprland's cursor position, a few times a second)."
+    },
+    "overlay_peek": {
+      "label": "Peek from the top edge",
+      "description": "Dropped against the top edge, Mochi hides there and peeks out when the pointer comes."
+    },
+    "overlay_open_on_hover": {
+      "label": "Open on hover",
+      "description": "While he peeks from the top edge, hovering him opens the approval panel."
     }
   },
   "state": {

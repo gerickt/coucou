@@ -1,8 +1,8 @@
 #!/bin/sh
 # Runs the plugin specs under the Luau CLI with a mocked Noctalia host.
 # Each spec is concatenated with the mocks and its entry script, since the
-# host gives every entry a single global environment. sprite.luau, soundbank.luau
-# and frames/manifest are copied next to it so the entries' require("./sprite") resolves.
+# host gives every entry a single global environment. sprite.luau, soundbank.luau,
+# wardrobe.luau and frames/manifest are copied next to it so the entries' require("./sprite") resolves.
 # Usage: mochi/tests/run.sh   (needs `luau` in PATH, or LUAU=/path/to/luau)
 set -eu
 LUAU=${LUAU:-luau}
@@ -12,6 +12,7 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 cp "$plugin/sprite.luau" "$tmp/sprite.luau"
 cp "$plugin/soundbank.luau" "$tmp/soundbank.luau"
+cp "$plugin/wardrobe.luau" "$tmp/wardrobe.luau"
 mkdir "$tmp/frames"
 cp "$plugin/frames/manifest.luau" "$tmp/frames/manifest.luau"
 status=0

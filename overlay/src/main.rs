@@ -1,7 +1,7 @@
 //! coucou-mochi: Mochi floating above the windows on the focused monitor.
 //!
 //!   coucou-mochi [--plugin-dir <dir>] [--managed]
-//!   coucou-mochi --quit
+//!   coucou-mochi --quit | --status
 //!
 //! Noctalia's desktop widgets live on the Bottom layer, under every window;
 //! this companion draws the same Mochi (the frames tools/render-mochi renders
@@ -110,6 +110,14 @@ fn take_lock() -> std::io::Result<Option<File>> {
     }
 }
 
+/// --status: 0 while an instance holds the session lock, 1 otherwise.
+fn status() -> i32 {
+    match File::open(lock_path()) {
+        Ok(f) if f.try_lock_shared().is_err() => 0,
+        _ => 1,
+    }
+}
+
 /// --quit: SIGTERM to the instance holding the lock.
 fn quit_running() -> i32 {
     let Ok(mut f) = File::open(lock_path()) else { return 0 };
@@ -166,7 +174,7 @@ fn read_published(path: &Path) -> Option<state::Published> {
 }
 
 fn usage() -> ! {
-    eprintln!("usage: coucou-mochi [--plugin-dir <dir>] [--managed] | --quit");
+    eprintln!("usage: coucou-mochi [--plugin-dir <dir>] [--managed] | --quit | --status");
     std::process::exit(2);
 }
 
@@ -179,6 +187,7 @@ fn main() {
             "--plugin-dir" => dir_arg = Some(PathBuf::from(args.next().unwrap_or_else(|| usage()))),
             "--managed" => managed = true,
             "--quit" => std::process::exit(quit_running()),
+            "--status" => std::process::exit(status()),
             "--version" => {
                 println!("coucou-mochi {}", env!("CARGO_PKG_VERSION"));
                 return;

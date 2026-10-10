@@ -135,4 +135,43 @@ cmd({ op = "reset" })
 check(#c().messages == 0 and c().file == nil, "new chat")
 cmd({ op = "send", question = "   " })
 check(not c().busy, "empty question ignored")
+
+-- ── Overlay (P14) ──
+local OVERLAY_FILE = "/run/user/1000/coucou-mochi.json"
+local function overlayState() return written[OVERLAY_FILE] and noctalia.json.decode(written[OVERLAY_FILE]) end
+local function overlayStream() for k in streams do if k:find("coucou-mochi --managed", 1, true) then return k end end end
+check(overlayStream() == nil, "no overlay without the coucou-mochi binary")
+commands["coucou-mochi"] = true
+config.mochi_surface = "overlay"
+config.outfit = "crown"
+asyncReplies["coucou-mochi --status"] = { exitCode = 1, stderr = "", stdout = "" }
+advance(1000); update()
+local o = overlayState()
+check(o and o.settings.mochi_surface == "overlay" and o.outfit == "crown" and o.outfit_choice == "crown", "state and settings published for the overlay")
+check(o.state == m().state and o.daemon == m().daemon and type(o.ts) == "number", "overlay file mirrors Mochi's state")
+check(o.settings.overlay_size == 120 and o.settings.overlay_layer == "top" and o.settings.overlay_follow_cursor == true and o.settings.overlay_peek == false, "overlay setting defaults")
+check(overlayStream() == "exec coucou-mochi --managed --plugin-dir '/plugin'", "overlay started, managed: " .. tostring(overlayStream()))
+-- Running already (status 0): not started again.
+streams[overlayStream()] = nil
+asyncReplies["coucou-mochi --status"] = { exitCode = 0, stderr = "", stdout = "" }
+advance(31000); update()
+check(overlayStream() == nil, "a running overlay is not started twice")
+-- Unchanged state: written again only as a heartbeat.
+local ts = overlayState().ts
+advance(1000); update()
+check(overlayState().ts == ts, "no write while nothing changes")
+advance(20000); update()
+check(overlayState().ts > ts, "heartbeat write")
+-- The desktop widget alone: the overlay is told to quit.
+config.mochi_surface = "desktop_widget"
+advance(1000); update()
+check(overlayState().settings.mochi_surface == "desktop_widget", "surface change published")
+check(table.find(calls, "coucou-mochi --quit") ~= nil, "overlay asked to quit")
+config.mochi_surface = nil
+-- A file dropped on the overlay goes to the chat.
+onIpc("attach", "/home/tester/drop.md")
+check(c().file and c().file.path == "/home/tester/drop.md" and c().file.name == "drop.md", "dropped file attached to the chat")
+check(lastCall() == "noctalia msg panel-open coucou/mochi:chat", "drop opens the chat")
+onIpc("attach", "relative/x")
+check(c().file.path == "/home/tester/drop.md", "relative drop path ignored")
 print("ALL PASSED")

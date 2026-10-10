@@ -28,6 +28,11 @@
 -- No random idle emotes: the original's main Mochi has none (the engine's
 -- doMiniBehaviorLoop only runs for mini bots).
 --
+-- With the plugin setting mochi_surface = "overlay" (the default) Mochi lives
+-- on the coucou-mochi overlay above the windows instead: this widget, on the
+-- Bottom layer under them, then draws nothing and stops ticking ("both"
+-- keeps the two).
+--
 -- Pure view: the state comes from the service through noctalia.state("mochi").
 -- Frames change at each sequence's own rate: per-frame ticks only while the
 -- next change is close, otherwise one update() timer set to the next change.
@@ -352,7 +357,23 @@ local function schedule()
   end
 end
 
+-- The overlay alone shows him: nothing here, a settings check once a second.
+local function overlayOnly()
+  return noctalia.getConfig("mochi_surface") == "overlay"
+end
+
+local function stepAside()
+  if lastTree ~= "aside" then
+    lastTree = "aside"
+    desktopWidget.render(ui.box({ width = 1, height = 1 }))
+  end
+  setTicking(false)
+  noctalia.setUpdateInterval(1000)
+end
+
 local function step(secs)
+  if overlayOnly() then return stepAside() end
+  if lastTree == "aside" then dirty = true end
   t += secs
   local i = 1
   while i <= #timers do
@@ -422,7 +443,7 @@ end
 if type(noctalia.state.get("mochi")) == "table" then snap = noctalia.state.get("mochi") end
 readReaction()
 sync()
-if not snap.paused and player:once("greet") then play("greeting") end
+if not snap.paused and not overlayOnly() and player:once("greet") then play("greeting") end
 readFirstName()
 noctalia.state.watch("mochi", readSnap)
 step(0)
