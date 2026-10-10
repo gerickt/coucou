@@ -1,0 +1,35 @@
+id = "coucou/mochi"
+name = "Mochi"
+version = "0.4.0"
+plugin_api = 22
+author = "gerickt"
+license = "MIT"
+icon = "bot"
+description = "Mochi keeps an eye on your Claude Code and AI agent sessions right in your Noctalia bar."
+tags = ["bar", "panel", "ai", "indicator", "agent", "utility"]
+dependencies = ["coucou-daemon", "xdg-open"]
+
+[[service]]
+id = "daemon"
+entry = "service.luau"
+
+[[widget]]
+id = "bar"
+entry = "bar.luau"
+
+  [widget.actions]
+  right = "plugin coucou/mochi:daemon all toggle-pause"
+
+[[widget.setting]]
+key = "show_label"
+type = "boolean"
+label_key = "settings.show_label.label"
+description_key = "settings.show_label.description"
+default = false
+
+[[widget.setting]]
+key = "show_tool"
+type = "boolean"
+label_key = "settings.show_tool.label"
+description_key = "settings.show_tool.description"
+default = true

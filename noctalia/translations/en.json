@@ -1,0 +1,21 @@
+{
+  "settings": {
+    "show_label": {
+      "label": "Show label",
+      "description": "Show the 'Mochi' text label next to the avatar."
+    },
+    "show_tool": {
+      "label": "Show active tool",
+      "description": "Show the tool currently running (e.g. bash, edit) beside Mochi."
+    }
+  },
+  "ui": {
+    "idle": "Idle",
+    "thinking": "Thinking…",
+    "running": "Running tool",
+    "permission": "Approval needed",
+    "done": "Finished",
+    "paused": "Paused",
+    "error": "Error"
+  }
+}
