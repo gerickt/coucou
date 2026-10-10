@@ -22,7 +22,7 @@ local function getEmoteGlyph(state, isPaused)
 end
 
 local function getEmoteColor(state, isPaused)
-    if isPaused then return "outline" end
+    if isPaused then return "on_surface_variant" end
     if state == "permission" then return "error" end
     if state == "thinking" then return "tertiary" end
     if state == "running" then return "primary" end
@@ -42,7 +42,8 @@ local function render()
     children[#children + 1] = ui.label({
         key = "mochi-face",
         text = glyph,
-        fill = color,
+        fontSize = 14,
+        color = color,
     })
 
     -- Optional tool or label
@@ -50,13 +51,15 @@ local function render()
         children[#children + 1] = ui.label({
             key = "mochi-tool",
             text = tostring(mochiState.tool),
-            fill = "on_secondary",
+            fontSize = 11,
+            color = "on_secondary",
         })
     elseif showLabel then
         children[#children + 1] = ui.label({
             key = "mochi-name",
             text = "Mochi",
-            fill = "on_secondary",
+            fontSize = 11,
+            color = "on_secondary",
         })
     end
 
