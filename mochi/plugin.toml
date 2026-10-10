@@ -6,7 +6,7 @@
 #            plays sounds, publishes everything to noctalia.state ("mochi")
 #            IPC: noctalia msg plugin coucou/mochi:daemon all toggle-pause|pause|resume|open
 # desktop -> the big animated Mochi (click, triple click, hover reactions)
-# bar     -> mini Mochi + current tool; left click opens the panel, right click pauses
+# bar     -> mini Mochi + current tool; left click opens the panel, right click opens the settings
 # sprite  -> shared: plays frames/ (the original Mochi engine, pre-rendered by
 #            tools/render-mochi) and resolves the outfit setting
 # panel   -> approval card (Allow / Deny) and AskUserQuestion answers
@@ -62,7 +62,7 @@ id = "bar"
 entry = "bar.luau"
 
   [widget.actions]
-  right = "plugin coucou/mochi:daemon all toggle-pause"
+  right = "settings-open-plugin coucou/mochi"
 
   [[widget.setting]]
   key = "show_tool"

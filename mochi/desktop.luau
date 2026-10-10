@@ -55,6 +55,8 @@ local shownState = nil
 local dizzy = false
 local slapTimes = {}
 local hoverSince = nil
+local toolsUntil = -1
+local hovering = false -- pointer over Mochi or his buttons; shows the buttons
 local lovedAt = -100
 local timers = {} -- { at = seconds, fn = function }
 local outfitCheckAt = -1
@@ -149,13 +151,30 @@ end
 
 function onMochiHover(state)
   local on = state == true or state == "true"
+  hovering = on
   if on and not hoverSince then
     if t - lovedAt >= 6 then play("hover") end
     hoverSince = t
   elseif not on then
     hoverSince = nil
+    toolsUntil = t + 3
   end
   wake()
+end
+
+-- Desktop widgets take no right click on images, and a plugin cannot move its
+-- own surface, so hovering Mochi shows two small buttons: settings (left or
+-- right click) and move, which opens Noctalia's desktop widget editor.
+local function msg(...)
+  noctalia.runAsync({ "noctalia", "msg", ... }, function() end, 3000)
+end
+
+function onSettingsClick()
+  msg("settings-open-plugin", "coucou/mochi")
+end
+
+function onMoveClick()
+  msg("desktop-widgets-edit")
 end
 
 -- ── Drawing ──────────────────────────────────────────────────────────────────
@@ -164,7 +183,8 @@ local function render()
   local S = tonumber(noctalia.getConfig("size")) or DEFAULT_SIZE
   local frame = player:frame()
   local label = stateText()
-  local key = tostring(frame) .. "|" .. label .. "|" .. S
+  local tools = hovering or t < toolsUntil
+  local key = tostring(frame) .. "|" .. label .. "|" .. S .. "|" .. tostring(tools)
   if key == lastTree then return end
   lastTree = key
   local picture = if frame
@@ -172,9 +192,15 @@ local function render()
     else ui.box({ width = S, height = S, onClick = "onMochiClick", onHover = "onMochiHover" })
   desktopWidget.render(ui.column({ width = S, align = "center", gap = 0 }, {
     picture,
-    ui.label({
-      text = label, fontSize = math.max(10, S * 0.08), fontWeight = "semibold",
-      color = "on_surface", textAlign = "center", maxWidth = S, maxLines = 1,
+    ui.row({ width = S, align = "center", justify = "center", gap = 4 }, {
+      ui.button({ glyph = "settings", variant = "ghost", controlSize = "sm", opacity = if tools then 1 else 0,
+        enabled = tools, onClick = "onSettingsClick", onRightClick = "onSettingsClick", onHover = "onMochiHover" }),
+      ui.label({
+        text = label, fontSize = math.max(10, S * 0.08), fontWeight = "semibold",
+        color = "on_surface", textAlign = "center", maxWidth = math.max(40, S - 80), maxLines = 1,
+      }),
+      ui.button({ glyph = "arrows-move", variant = "ghost", controlSize = "sm", opacity = if tools then 1 else 0,
+        enabled = tools, onClick = "onMoveClick", onRightClick = "onSettingsClick", onHover = "onMochiHover" }),
     }),
   }))
 end
