@@ -12,11 +12,9 @@ local DAEMON = "coucou-daemon"
 local AGENTS_PANEL = "coucou/mochi:agents"
 local CHAT_PANEL = "coucou/mochi:chat"
 
-local AGENTS = {
-  [""] = "Claude Code", ["claude-desktop"] = "Claude", gemini = "Gemini CLI", antigravity = "Antigravity",
-  codex = "Codex", cursor = "Cursor", copilot = "Copilot CLI", opencode = "OpenCode", muse = "Muse Code",
-  amp = "Amp", hermes = "Hermes",
-}
+local okPills, pills = pcall(require, "./pills.luau")
+if not okPills then pills = require("./pills") end
+local WARDROBE_PANEL = "coucou/mochi:wardrobe"
 
 local snap = {}
 local shownId = nil -- request id the panel is showing
@@ -26,7 +24,14 @@ local sending = false
 local function tr(key, args) return noctalia.tr(key, args) end
 
 local function agentName(id)
-  return AGENTS[id or ""] or tostring(id)
+  return pills.agentName(id)
+end
+
+-- Asks the service (it knows the sessions' folders): "terminal", "focus", "dismiss".
+local cmdSeq = 0
+local function ask(event, payload)
+  cmdSeq += 1
+  noctalia.state.set("mochi.cmd", { event = event, payload = payload, seq = cmdSeq })
 end
 
 local function safeId(id)
@@ -70,6 +75,25 @@ end
 function onChat()
   panel.close()
   noctalia.runAsync({ "noctalia", "msg", "panel-open", CHAT_PANEL }, nil)
+end
+
+function onOpenTerminal()
+  local p = snap.pending
+  local f = snap.finished
+  local id = if p then p.session elseif f then f.session else nil
+  ask("terminal", id)
+end
+
+function onFinishedOk()
+  ask("dismiss")
+  panel.close()
+end
+
+function onFinishedTerminal()
+  local f = snap.finished
+  ask("terminal", f and f.session or nil)
+  ask("dismiss")
+  panel.close()
 end
 
 function onTerminal()
@@ -150,6 +174,7 @@ local function approvalView(p)
       ui.button({ text = tr("panel.deny"), variant = "destructive", flexGrow = 1, onClick = "onDeny", enabled = not sending }),
       ui.button({ text = tr("panel.allow"), variant = "primary", flexGrow = 1, onClick = "onAllow", enabled = not sending }),
     }),
+    ui.button({ text = tr("finished.open_terminal"), glyph = "terminal-2", variant = "ghost", onClick = "onOpenTerminal" }),
   })
 end
 
@@ -186,8 +211,52 @@ local function questionView(p)
     ui.scroll({ flexGrow = 1, gap = 14 }, blocks),
     ui.row({ gap = 8 }, {
       ui.button({ text = tr("panel.terminal"), variant = "ghost", flexGrow = 1, onClick = "onTerminal", enabled = not sending }),
+      ui.button({ glyph = "terminal-2", variant = "ghost", onClick = "onOpenTerminal", tooltip = tr("finished.open_terminal") }),
       ui.button({ text = tr("panel.submit"), variant = "primary", flexGrow = 1, onClick = "onSubmit",
         enabled = not sending and allAnswered(p.questions) }),
+    }),
+  })
+end
+
+-- One session as the original's pill: a tint of its agent's colour, a badge.
+local function pillRow(sess)
+  local color = sess.color or pills.agentColor(sess.agent)
+  local badge = sess.badge
+  local title = if type(sess.project) == "string" and sess.project ~= "" then sess.project else agentName(sess.agent)
+  local kids = {
+    ui.box({ width = 10, height = 10, radius = 5, fill = color }),
+    ui.column({ gap = 0, flexGrow = 1 }, {
+      ui.label({ text = title, fontWeight = "semibold", maxWidth = 190, maxLines = 1 }),
+      ui.label({ text = agentName(sess.agent) .. " · " .. tr("state." .. (sess.state or "idle")), fontSize = 11,
+        color = "on_surface_variant", maxWidth = 190, maxLines = 1 }),
+    }),
+  }
+  if badge and pills.BADGES[badge] then
+    table.insert(kids, ui.box({ width = 12, height = 12, radius = 6, fill = pills.BADGES[badge] }))
+  end
+  local id = sess.id
+  table.insert(kids, ui.button({
+    key = "t" .. tostring(id), glyph = "terminal-2", variant = "ghost", controlSize = "sm",
+    tooltip = tr("finished.open_terminal"), onClick = function() ask("terminal", id) end,
+  }))
+  return ui.row({
+    key = "s" .. tostring(id), gap = 8, align = "center", padding = 8, radius = 10,
+    fill = pills.tint(color, if sess.focused then "2e" else "14"), border = pills.tint(color, "24"), borderWidth = 1,
+    onClick = function() ask("focus", id) end,
+  }, kids)
+end
+
+-- The finished card (buildFinished): the agent, its final message, Open terminal / OK.
+local function finishedView(f)
+  local line = if type(f.line) == "string" and f.line ~= "" then f.line else tr("finished.none")
+  return ui.column({ padding = 16, gap = 12, flexGrow = 1 }, {
+    header(tr("finished.title", { agent = agentName(f.agent) }), where(f)),
+    ui.scroll({ flexGrow = 1, fill = "surface_variant", radius = 10, padding = 10 }, {
+      ui.label({ text = line, fontSize = 14, color = "on_surface", maxWidth = 380, maxLines = 40 }),
+    }),
+    ui.row({ gap = 8 }, {
+      ui.button({ text = tr("finished.open_terminal"), variant = "primary", flexGrow = 1, onClick = "onFinishedTerminal" }),
+      ui.button({ text = tr("finished.ok"), variant = "outline", flexGrow = 1, onClick = "onFinishedOk" }),
     }),
   })
 end
@@ -198,11 +267,7 @@ local function emptyView()
     else tr("panel.empty")
   local rows = {}
   for _, s in (snap.sessions or {}) do
-    table.insert(rows, ui.row({ gap = 8, align = "center" }, {
-      ui.label({ text = if s.project ~= "" then s.project else agentName(s.agent), fontWeight = "semibold", maxWidth = 200, maxLines = 1 }),
-      ui.spacer({ flexGrow = 1 }),
-      ui.label({ text = tr("state." .. (s.state or "idle")), fontSize = 12, color = "on_surface_variant" }),
-    }))
+    table.insert(rows, pillRow(s))
   end
   if #rows == 0 then
     table.insert(rows, ui.label({ text = tr("panel.no_sessions"), fontSize = 12, color = "on_surface_variant" }))
@@ -210,12 +275,19 @@ local function emptyView()
   return ui.column({ padding = 16, gap = 12, flexGrow = 1 }, {
     header("Mochi", status),
     ui.label({ text = tr("panel.recent"), fontSize = 12, fontWeight = "semibold", color = "primary" }),
-    ui.scroll({ flexGrow = 1, gap = 8 }, rows),
+    ui.scroll({ flexGrow = 1, gap = 6 }, rows),
     ui.row({ gap = 8 }, {
       ui.button({ text = tr("panel.chat"), glyph = "message-circle", variant = "outline", onClick = "onChat", flexGrow = 1 }),
       ui.button({ text = tr("panel.agents"), glyph = "plug-connected", variant = "outline", onClick = "onAgents", flexGrow = 1 }),
+      ui.button({ glyph = "hanger", variant = "outline", onClick = "onWardrobe", tooltip = tr("panel.wardrobe") }),
     }),
   })
+end
+
+-- The wardrobe lives in its own panel too.
+function onWardrobe()
+  panel.close()
+  noctalia.runAsync({ "noctalia", "msg", "panel-open", WARDROBE_PANEL }, nil)
 end
 
 render = function()
@@ -226,6 +298,9 @@ render = function()
       answers = {}
     end
     panel.render(if p.questions then questionView(p) else approvalView(p))
+  elseif snap.finished then
+    shownId = nil
+    panel.render(finishedView(snap.finished))
   else
     shownId = nil
     panel.render(emptyView())

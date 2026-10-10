@@ -15,7 +15,11 @@ local okSprite, sprite = pcall(require, "./sprite.luau")
 if not okSprite then sprite = require("./sprite") end
 sprite.setup(noctalia)
 
+local okPills, pills = pcall(require, "./pills.luau")
+if not okPills then pills = require("./pills") end
+
 local PANEL = "coucou/mochi:approval"
+local MAX_CHIPS = 4
 local ICON = 26
 
 local STATES = {
@@ -47,6 +51,12 @@ local function render()
   local tool = snap.tool
   local showTool = noctalia.getConfig("show_tool") ~= false and type(tool) == "string" and tool ~= ""
     and (state == "working" or state == "searching" or state == "approval" or state == "question")
+  -- One chip per session in its agent's colour; a ring in the badge's colour.
+  local chips = {}
+  for i, sess in (snap.sessions or {}) do
+    if i > MAX_CHIPS then break end
+    table.insert(chips, { color = sess.color or pills.agentColor(sess.agent), badge = sess.badge })
+  end
   local key = table.concat({ tostring(frame), tostring(snap.pending ~= nil), if showTool then tool else "", tostring(snap.rev) }, "|")
   if key == lastTree then return end
   lastTree = key
@@ -60,6 +70,17 @@ local function render()
   end
   if snap.pending then
     table.insert(children, ui.box({ width = 6, height = 6, radius = 3, fill = DOT[state] or "#F5A524" }))
+  end
+  if #chips > 0 then
+    local dots = {}
+    for _, c in chips do
+      local badge = pills.BADGES[c.badge or ""]
+      table.insert(dots, ui.box({
+        width = 8, height = 8, radius = 4, fill = c.color,
+        border = badge, borderWidth = if badge then 2 else 0,
+      }))
+    end
+    table.insert(children, ui.row({ gap = 3, align = "center" }, dots))
   end
   if showTool then
     table.insert(children, ui.label({ text = tool, maxWidth = 120, maxLines = 1 }))

@@ -13,12 +13,13 @@ trap 'rm -rf "$tmp"' EXIT
 cp "$plugin/sprite.luau" "$tmp/sprite.luau"
 cp "$plugin/soundbank.luau" "$tmp/soundbank.luau"
 cp "$plugin/wardrobe.luau" "$tmp/wardrobe.luau"
+cp "$plugin/tile.luau" "$tmp/tile.luau"
 cp "$plugin/pills.luau" "$tmp/pills.luau"
 cp "$plugin/identity.luau" "$tmp/identity.luau"
 mkdir "$tmp/frames"
 cp "$plugin/frames/manifest.luau" "$tmp/frames/manifest.luau"
 status=0
-for entry in service desktop bar panel agents chat shortcut; do
+for entry in service desktop bar panel agents chat shortcut wardrobe_panel menu tile_mute tile_wardrobe; do
   ui="$here/mock_ui.luau"
   [ "$entry" = service ] && ui=/dev/null
   cat "$here/mock_host.luau" "$here/mock_json.luau" "$ui" "$plugin/$entry.luau" "$here/${entry}_spec.luau" > "$tmp/$entry.luau"

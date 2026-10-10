@@ -102,7 +102,8 @@
     "no_sessions": "No sessions yet.",
     "send_failed": "Could not reach coucou-daemon; the agent will ask in its terminal.",
     "agents": "Agents…",
-    "chat": "Chat…"
+    "chat": "Chat…",
+    "wardrobe": "Wardrobe"
   },
   "desktop": {
     "agents": "Agents",
@@ -181,12 +182,30 @@
     "back": "Back to the chat"
   },
   "shortcut": {
-    "chat": "Mochi chat"
+    "chat": "Mochi chat",
+    "island": "Mochi panel",
+    "alert": "Waiting request",
+    "terminal": "Open terminal",
+    "next": "Next session",
+    "prev": "Previous session",
+    "mute": "Mute Mochi",
+    "desktop": "Mochi off the desktop",
+    "wardrobe": "Wardrobe"
   },
   "finished": {
     "title": "{agent} finished",
     "none": "Session finished",
     "open_terminal": "Open terminal",
     "ok": "OK"
+  },
+  "wardrobe": {
+    "title": "Wardrobe",
+    "wearing": "Wearing: {outfit}"
+  },
+  "menu": {
+    "wardrobe": "Wardrobe",
+    "agents": "Agents",
+    "chat": "Chat",
+    "settings": "Settings"
   }
 }

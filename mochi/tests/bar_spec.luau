@@ -33,6 +33,13 @@ assert(shows("santaHat.dance"), "the bar dances while music plays")
 noctalia.state.set("mochi", { state = "approval", daemon = true, music = true, pending = { id = "1-1" }, rev = 9 })
 for i = 1, 3 do advance(100) update() end
 assert(shows("santaHat.approval"), "an alert wins over the music")
+noctalia.state.set("mochi", { state = "working", daemon = true, rev = 20, sessions = {
+  { id = "a", agent = "codex", color = "#2DD4BF", badge = "finished" }, { id = "b", agent = "", color = "#F5F6F8" } } })
+for i = 1, 2 do advance(100) update() end
+local chips = {}
+find(rendered, function(n) if n.type == "box" and n.props.width == 8 then table.insert(chips, n) end return false end)
+assert(#chips == 2 and chips[1].props.fill == "#2DD4BF" and chips[1].props.border == "#22C55E" and chips[2].props.fill == "#F5F6F8", "one chip per session in its colour, ringed by the badge")
+print("ok  session chips")
 onClick()
 assert(calls[#calls] == "toggle coucou/mochi:approval")
 print("BAR PASSED")

@@ -4,7 +4,7 @@
 #
 # service -> follows `coucou-daemon --follow`, runs Mochi's state machine,
 #            plays sounds, publishes everything to noctalia.state ("mochi")
-#            IPC: noctalia msg plugin coucou/mochi:daemon all toggle-pause|pause|resume|open|agents|chat|attach <path>
+#            IPC: noctalia msg plugin coucou/mochi:daemon all <event> (README lists them all)
 #            starts the coucou-mochi overlay (mochi_surface = overlay | both)
 # desktop -> the big animated Mochi (click, triple click, hover reactions); steps
 #            aside when mochi_surface = overlay (it lives under the windows)
@@ -17,6 +17,10 @@
 # chat    -> the chat (Anthropic, Google, OpenAI, OpenRouter, Ollama, LM Studio,
 #            custom server), streamed by `coucou-daemon chat`; API keys in the
 #            Secret Service, only their presence is shown
+# wardrobe-> the outfit grid: hover tries one on Mochi, click keeps it
+# menu    -> the small menu the overlay's right click opens (Wardrobe, Agents, Chat, Settings)
+# tiles   -> one quick-settings tile per original global shortcut (island, alert,
+#            terminal, next, prev, mute, desktop, wardrobe); keys in Hyprland: README
 # shortcut-> quick-settings tile that opens the chat. A key for it in Hyprland:
 #            bind = CTRL ALT, Space, exec, noctalia msg panel-toggle coucou/mochi:chat
 #
@@ -190,6 +194,50 @@ width = 460
 height = 640
 keyboard_focus = "on_demand"
 
+[[panel]]
+id = "wardrobe"
+entry = "wardrobe_panel.luau"
+width = 400
+height = 440
+
+[[panel]]
+id = "menu"
+entry = "menu.luau"
+width = 200
+height = 176
+
 [[shortcut]]
 id = "chat-tile"
 entry = "shortcut.luau"
+
+[[shortcut]]
+id = "island-tile"
+entry = "tile_island.luau"
+
+[[shortcut]]
+id = "alert-tile"
+entry = "tile_alert.luau"
+
+[[shortcut]]
+id = "terminal-tile"
+entry = "tile_terminal.luau"
+
+[[shortcut]]
+id = "next-tile"
+entry = "tile_next.luau"
+
+[[shortcut]]
+id = "prev-tile"
+entry = "tile_prev.luau"
+
+[[shortcut]]
+id = "mute-tile"
+entry = "tile_mute.luau"
+
+[[shortcut]]
+id = "desktop-tile"
+entry = "tile_desktop.luau"
+
+[[shortcut]]
+id = "wardrobe-tile"
+entry = "tile_wardrobe.luau"
