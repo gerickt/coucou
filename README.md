@@ -137,6 +137,30 @@ bind = CTRL ALT, Space, exec, noctalia msg panel-toggle coucou/mochi:chat
 
 The requests leave from `coucou-daemon chat`, which hands `curl` the address, headers and body on its stdin: no key is ever on a command line or on disk. Nothing is sent anywhere until you ask a question or open the model list.
 
+### 6. Sessions, shortcuts and wardrobe
+
+- **Sessions**: the bar panel lists every session as the original's pill (the agent's colour, a badge for approval, finished or error), and the bar shows a chip per session. Click a pill to make Mochi show it.
+- **Finished card**: when a turn ends, the panel shows the agent's final message (and a notification carries it; the *Notify when a session finishes* setting turns that off). The card closes after 30 s, or on **OK**.
+- **Open terminal**: on approval cards, the finished card and every session pill. `coucou-daemon` remembers, per session, the process ancestry of the relay (read from `/proc` while the relay is connected) and focuses the Hyprland window of the nearest ancestor (the one titled after the folder when there are several). In kitty with `allow_remote_control` and `listen_on`, the session's tab is selected too. Nothing found: the folder opens in VS Code, or the file manager. A session whose events the daemon did not see yet has no remembered window; its next event settles it.
+- **Wardrobe**: a grid of the outfits. Resting the pointer on one tries it on Mochi (bar, desktop widget and overlay), a click keeps it. A kept outfit applies until you change the *Outfit* setting. Right click on the overlay opens a small menu: Wardrobe, Agents, Chat, Settings.
+- **Text under Mochi** on the overlay: "Coucou, <name>!" for 3.5 s at launch, then the running tool, or what waits ("Approval needed", "Paused"). The *Text under Mochi* setting turns it off.
+
+Hyprland owns global keys, so each of the original's shortcuts is an event the plugin answers; bind the ones you want in `hyprland.conf` (the original's Ctrl+Alt+... keys):
+
+```
+bind = CTRL ALT, Space, exec, noctalia msg panel-toggle coucou/mochi:chat
+bind = CTRL ALT, N, exec, noctalia msg plugin coucou/mochi:daemon all island
+bind = CTRL ALT, A, exec, noctalia msg plugin coucou/mochi:daemon all alert
+bind = CTRL ALT, T, exec, noctalia msg plugin coucou/mochi:daemon all terminal
+bind = CTRL ALT, Right, exec, noctalia msg plugin coucou/mochi:daemon all next
+bind = CTRL ALT, Left, exec, noctalia msg plugin coucou/mochi:daemon all prev
+bind = CTRL ALT, S, exec, noctalia msg plugin coucou/mochi:daemon all mute
+bind = CTRL ALT, D, exec, noctalia msg plugin coucou/mochi:daemon all desktop
+bind = CTRL ALT, G, exec, noctalia msg panel-toggle coucou/mochi:wardrobe
+```
+
+Open or close the island (N), go to the waiting request (A), open the terminal of the current session (T), next and previous session, mute, send Mochi off the overlay and back (D), open the wardrobe (G). Hyprland with a Lua config writes them as `hl.bind("CTRL + ALT + A", hl.dsp.exec_cmd("..."))`. Each also exists as a quick-settings tile. "Attach the front window" (Ctrl+Alt+F) was reserved in the original, never ported, and is not here either.
+
 ## Commands
 
 | Command | What it does |
@@ -149,6 +173,7 @@ The requests leave from `coucou-daemon chat`, which hands `curl` the address, he
 | `noctalia msg plugin coucou/mochi:daemon all agents` | Opens the Agents panel |
 | `noctalia msg panel-toggle coucou/mochi:chat` | Opens or closes the chat |
 | `noctalia msg plugin coucou/mochi:daemon all attach <path>` | A file for a new chat (what a drop on Mochi does) |
+| `coucou-daemon open-terminal <session> [--cwd <dir>]` | Focus a session's terminal window |
 | `coucou-mochi [--plugin-dir <dir>]` | Mochi above the windows (the plugin runs it with `--managed`) |
 | `coucou-mochi --status` / `--quit` | Is it running / stop it |
 | `coucou-daemon secret has\|set\|delete <provider>` | A key's presence, or saves (from stdin) / deletes it in the keyring |
